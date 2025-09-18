@@ -67,13 +67,25 @@ const SizeManagement: React.FC = () => {
   const updateSizeMutation = useMutation(sizeApi.updateSize);
   const deleteSizeMutation = useMutation(sizeApi.deleteSize);
 
+  // Validation helpers
+  const isSizeNameTaken = async (name: string, excludeId?: number) => {
+    try {
+      const found = await sizeApi.getSizeByName(name);
+      if (!found) return false;
+      if (excludeId && found.sizeId === excludeId) return false;
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
   const handleCreateSize = async (values: CreateSizeRequest) => {
     Modal.confirm({
-      title: <span style={{ fontSize: 20, fontWeight: 700 }}>Confirm create size</span>,
+      title: <span style={{ fontSize: 20, fontWeight: 700 }}>Xác nhận tạo size</span>,
       icon: <ExclamationCircleOutlined />,
-      content: <div style={{ fontSize: 18 }}>Create size "{values.sizeName}"?</div>,
-      okText: 'Create',
-      cancelText: 'Cancel',
+      content: <div style={{ fontSize: 18 }}>Tạo size "{values.sizeName}"?</div>,
+      okText: 'Tạo',
+      cancelText: 'Hủy',
       okButtonProps: { size: 'large', type: 'primary' },
       cancelButtonProps: { size: 'large' },
       onOk: async () => {
@@ -81,7 +93,7 @@ const SizeManagement: React.FC = () => {
         try {
           const result = await createSizeMutation.mutate(values);
           if (result) {
-            notification.success({ message: <span style={{ fontSize: 20, fontWeight: 600 }}>Success</span>, description: <div style={{ fontSize: 18 }}>Size created successfully</div>, duration: 1.8, placement: 'top', style: { padding: 12 } });
+            notification.success({ message: 'Thành công', description: 'Tạo size thành công' });
             playSound('success');
             setIsModalVisible(false);
             form.resetFields();
@@ -89,7 +101,7 @@ const SizeManagement: React.FC = () => {
           }
         } catch (error) {
           console.error('Create Error:', error);
-          notification.error({ message: <span style={{ fontSize: 20, fontWeight: 600 }}>Error</span>, description: <div style={{ fontSize: 18 }}>Failed to create size in database</div>, duration: 2.2, placement: 'top', style: { padding: 12 } });
+          notification.error({ message: 'Lỗi', description: 'Tạo size thất bại' });
           playSound('error');
         }
       },
@@ -99,11 +111,11 @@ const SizeManagement: React.FC = () => {
   const handleUpdateSize = async (values: UpdateSizeRequest) => {
     if (!editingSize) return;
     Modal.confirm({
-      title: <span style={{ fontSize: 20, fontWeight: 700 }}>Confirm update size</span>,
+      title: <span style={{ fontSize: 20, fontWeight: 700 }}>Xác nhận cập nhật size</span>,
       icon: <ExclamationCircleOutlined />,
-      content: <div style={{ fontSize: 18 }}>Update size to "{values.sizeName}"?</div>,
-      okText: 'Update',
-      cancelText: 'Cancel',
+      content: <div style={{ fontSize: 18 }}>Cập nhật thành "{values.sizeName}"?</div>,
+      okText: 'Cập nhật',
+      cancelText: 'Hủy',
       okButtonProps: { size: 'large', type: 'primary' },
       cancelButtonProps: { size: 'large' },
       onOk: async () => {
@@ -111,7 +123,7 @@ const SizeManagement: React.FC = () => {
         try {
           const result = await updateSizeMutation.mutate(editingSize.sizeId, values);
           if (result) {
-            notification.success({ message: <span style={{ fontSize: 20, fontWeight: 600 }}>Success</span>, description: <div style={{ fontSize: 18 }}>Size updated successfully</div>, duration: 1.8, placement: 'top', style: { padding: 12 } });
+            notification.success({ message: 'Thành công', description: 'Cập nhật size thành công' });
             playSound('success');
             setIsModalVisible(false);
             setEditingSize(null);
@@ -119,7 +131,7 @@ const SizeManagement: React.FC = () => {
             fetchSizes();
           }
         } catch (error) {
-          notification.error({ message: <span style={{ fontSize: 20, fontWeight: 600 }}>Error</span>, description: <div style={{ fontSize: 18 }}>Failed to update size</div>, duration: 2.2, placement: 'top', style: { padding: 12 } });
+          notification.error({ message: 'Lỗi', description: 'Cập nhật size thất bại' });
           playSound('error');
         }
       },
@@ -129,14 +141,14 @@ const SizeManagement: React.FC = () => {
   const handleDeleteSize = async (sizeId: number) => {
     try {
       await deleteSizeMutation.mutate(sizeId);
-      notification.success({ message: <span style={{ fontSize: 20, fontWeight: 600 }}>Success</span>, description: <div style={{ fontSize: 18 }}>Size deleted successfully</div>, duration: 1.8, placement: 'top', style: { padding: 12 } });
+      notification.success({ message: 'Thành công', description: 'Xóa size thành công' });
       playSound('success');
       // Optimistic update
       setSizes(prev => prev.filter(s => s.sizeId !== sizeId));
       // Background refresh to stay in sync
       fetchSizes();
     } catch (error) {
-      notification.error({ message: <span style={{ fontSize: 20, fontWeight: 600 }}>Error</span>, description: <div style={{ fontSize: 18 }}>Failed to delete size</div>, duration: 2.2, placement: 'top', style: { padding: 12 } });
+      notification.error({ message: 'Lỗi', description: 'Xóa size thất bại' });
       playSound('error');
     }
   };
@@ -178,12 +190,23 @@ const SizeManagement: React.FC = () => {
       sorter: (a: Size, b: Size) => a.sizeId - b.sizeId,
     },
     {
-      title: 'Size Name',
+      title: 'Tên size',
       dataIndex: 'sizeName',
       key: 'sizeName',
       sorter: (a: Size, b: Size) => a.sizeName.localeCompare(b.sizeName),
       render: (text: string) => (
-        <Tag color="blue" style={{ fontSize: '14px', padding: '4px 12px' }}>
+        <Tag
+          color="#e6f4ff"
+          style={{
+            color: '#1677ff',
+            fontSize: 16,
+            padding: '6px 14px',
+            borderRadius: 10,
+            border: '1px solid #91caff',
+            minWidth: 48,
+            textAlign: 'center',
+          }}
+        >
           {text}
         </Tag>
       ),
@@ -192,19 +215,19 @@ const SizeManagement: React.FC = () => {
       // Removed Created At column
     },
     {
-      title: 'Actions',
+      title: 'Thao tác',
       key: 'actions',
       width: 120,
       render: (_: any, record: Size) => (
         <Space size="small">
-          <Tooltip title="Edit">
+          <Tooltip title="Sửa">
             <Button
               type="text"
               icon={<EditOutlined />}
               onClick={() => handleEdit(record)}
             />
           </Tooltip>
-          <Tooltip title="Delete">
+          <Tooltip title="Xóa">
             <Button
               type="text"
               danger
@@ -227,7 +250,7 @@ const SizeManagement: React.FC = () => {
         <Col span={8}>
           <Card>
             <Statistic
-              title="Total Sizes"
+              title="Tổng size"
               value={sizes.length}
               prefix={<TagsOutlined />}
               valueStyle={{ color: '#1890ff' }}
@@ -237,7 +260,7 @@ const SizeManagement: React.FC = () => {
         <Col span={8}>
           <Card>
             <Statistic
-              title="Active Sizes"
+              title="Đang dùng"
               value={sizes.length}
               prefix={<TagsOutlined />}
               valueStyle={{ color: '#52c41a' }}
@@ -247,7 +270,7 @@ const SizeManagement: React.FC = () => {
         <Col span={8}>
           <Card>
             <Statistic
-              title="Most Used"
+              title="Phổ biến"
               value="M"
               prefix={<TagsOutlined />}
               valueStyle={{ color: '#722ed1' }}
@@ -261,16 +284,16 @@ const SizeManagement: React.FC = () => {
           <Row gutter={[16, 16]} align="middle">
             <Col flex="auto">
               <Title level={4} style={{ margin: 0 }}>
-                Size Management
+                Quản lý Size
               </Title>
               <Text type="secondary">
-                Manage product sizes for your clothing store
+                Quản lý danh sách size sản phẩm
               </Text>
             </Col>
             <Col>
               <Space>
                 <Input
-                  placeholder="Search sizes..."
+                  placeholder="Tìm kiếm size..."
                   prefix={<SearchOutlined />}
                   value={searchText}
                   onChange={(e) => setSearchText(e.target.value)}
@@ -281,17 +304,17 @@ const SizeManagement: React.FC = () => {
                   onClick={fetchSizes}
                   loading={loading}
                 >
-                  Refresh
+                  Làm mới
                 </Button>
                 <Button
                   type="primary"
                   icon={<PlusOutlined />}
                   onClick={() => setIsModalVisible(true)}
                 >
-                  Add Size
+                  Thêm Size
                 </Button>
                 <Button icon={<ExportOutlined />}>
-                  Export
+                  Xuất
                 </Button>
               </Space>
             </Col>
@@ -314,7 +337,7 @@ const SizeManagement: React.FC = () => {
       </Card>
 
       <Modal
-        title={<span style={{ fontSize: 22, fontWeight: 700 }}>{editingSize ? 'Edit Size' : 'Add New Size'}</span>}
+        title={<span style={{ fontSize: 22, fontWeight: 700 }}>{editingSize ? 'Sửa Size' : 'Thêm Size mới'}</span>}
         open={isModalVisible}
         onCancel={handleModalClose}
         footer={null}
@@ -329,11 +352,27 @@ const SizeManagement: React.FC = () => {
         >
           <Form.Item
             name="sizeName"
-            label="Size Name"
-            rules={[VALIDATION_RULES.REQUIRED, VALIDATION_RULES.SIZE_NAME]}
+            label="Tên size"
+            rules={[
+              { required: true, message: 'Vui lòng nhập tên size' },
+              VALIDATION_RULES.SIZE_NAME,
+              {
+                pattern: new RegExp('^[\\\p{L}\\\p{N}\\- ]+$','u'),
+                message: 'Chỉ cho phép chữ (có dấu), số, khoảng trắng và -',
+              },
+              {
+                validator: async (_, value) => {
+                  const val = (value || '').toString().trim().toUpperCase();
+                  if (!val) return Promise.resolve();
+                  const taken = await isSizeNameTaken(val, editingSize?.sizeId);
+                  if (taken) return Promise.reject(new Error('Size đã tồn tại'));
+                  return Promise.resolve();
+                },
+              },
+            ]}
           >
             <Input 
-              placeholder="Enter size name (e.g., S, M, L, XL)" 
+              placeholder="Nhập tên size (VD: S, M, L, XL)" 
               style={{ textTransform: 'uppercase' }}
               onChange={(e) => {
                 e.target.value = e.target.value.toUpperCase();
@@ -344,7 +383,7 @@ const SizeManagement: React.FC = () => {
           <Form.Item style={{ marginBottom: 0, textAlign: 'right' }}>
             <Space>
               <Button size="large" onClick={handleModalClose}>
-                Cancel
+                Hủy
               </Button>
               <Button
                 type="primary"
@@ -352,7 +391,7 @@ const SizeManagement: React.FC = () => {
                 size="large"
                 loading={createSizeMutation.isLoading || updateSizeMutation.isLoading}
               >
-                {editingSize ? 'Update' : 'Create'}
+                {editingSize ? 'Cập nhật' : 'Tạo'}
               </Button>
             </Space>
           </Form.Item>

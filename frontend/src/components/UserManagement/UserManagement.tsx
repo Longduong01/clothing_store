@@ -9,7 +9,7 @@ import {
   Modal,
   Form,
   message,
-  Popconfirm,
+  notification,
   Tag,
   Typography,
   Row,
@@ -26,14 +26,16 @@ import {
   UserOutlined,
   ReloadOutlined,
   ExportOutlined,
+  ExclamationCircleOutlined,
 } from '@ant-design/icons';
 import { userApi } from '../../services/api';
 import { User, CreateUserRequest, UpdateUserRequest, UserRole } from '../../types';
 import { PAGINATION_CONFIG, VALIDATION_RULES, USER_ROLES } from '../../utils/constants';
 import { useMutation } from '../../hooks/useApi';
 import dayjs from 'dayjs';
+import { playSound } from '../../utils/sound';
 
-const { Title, Text } = Typography;
+const { Title, } = Typography;
 const { Option } = Select;
 
 const UserManagement: React.FC = () => {
@@ -72,46 +74,77 @@ const UserManagement: React.FC = () => {
   const deleteUserMutation = useMutation(userApi.deleteUser);
 
   const handleCreateUser = async (values: CreateUserRequest) => {
-    try {
-      const result = await createUserMutation.mutate(values);
-      if (result) {
-        message.success('User created successfully');
-        setIsModalVisible(false);
-        form.resetFields();
-        fetchUsers();
-      }
-    } catch (error) {
-      message.error('Failed to create user');
-    }
+    Modal.confirm({
+      title: <span style={{ fontSize: 20, fontWeight: 700 }}>Xác nhận tạo người dùng</span>,
+      icon: <ExclamationCircleOutlined />,
+      content: <div style={{ fontSize: 18 }}>Tạo người dùng "{values.username}"?</div>,
+      okText: 'Tạo', cancelText: 'Hủy', okButtonProps: { size: 'large', type: 'primary' }, cancelButtonProps: { size: 'large' },
+      onOk: async () => {
+        playSound('confirm');
+        try {
+          const result = await createUserMutation.mutate(values);
+          if (result) {
+            notification.success({ message: 'Thành công', description: 'Tạo người dùng thành công' });
+            playSound('success');
+            setIsModalVisible(false);
+            form.resetFields();
+            fetchUsers();
+          }
+        } catch {
+          notification.error({ message: 'Lỗi', description: 'Tạo người dùng thất bại' });
+          playSound('error');
+        }
+      },
+    });
   };
 
   const handleUpdateUser = async (values: UpdateUserRequest) => {
     if (!editingUser) return;
-    
-    try {
-      const result = await updateUserMutation.mutate(editingUser.userId, values);
-      if (result) {
-        message.success('User updated successfully');
-        setIsModalVisible(false);
-        setEditingUser(null);
-        form.resetFields();
-        fetchUsers();
-      }
-    } catch (error) {
-      message.error('Failed to update user');
-    }
+    Modal.confirm({
+      title: <span style={{ fontSize: 20, fontWeight: 700 }}>Xác nhận cập nhật người dùng</span>,
+      icon: <ExclamationCircleOutlined />,
+      content: <div style={{ fontSize: 18 }}>Cập nhật thông tin người dùng "{values.username ?? editingUser.username}"?</div>,
+      okText: 'Cập nhật', cancelText: 'Hủy', okButtonProps: { size: 'large', type: 'primary' }, cancelButtonProps: { size: 'large' },
+      onOk: async () => {
+        playSound('confirm');
+        try {
+          const result = await updateUserMutation.mutate(editingUser.userId, values);
+          if (result) {
+            notification.success({ message: 'Thành công', description: 'Cập nhật người dùng thành công' });
+            playSound('success');
+            setIsModalVisible(false);
+            setEditingUser(null);
+            form.resetFields();
+            fetchUsers();
+          }
+        } catch {
+          notification.error({ message: 'Lỗi', description: 'Cập nhật người dùng thất bại' });
+          playSound('error');
+        }
+      },
+    });
   };
 
   const handleDeleteUser = async (userId: number) => {
     try {
-      const result = await deleteUserMutation.mutate(userId);
-      if (result !== undefined) {
-        message.success('User deleted successfully');
-        fetchUsers();
-      }
+      await deleteUserMutation.mutate(userId);
+      notification.success({ message: 'Thành công', description: 'Xóa người dùng thành công' });
+      playSound('success');
+      fetchUsers();
     } catch (error) {
-      message.error('Failed to delete user');
+      notification.error({ message: 'Lỗi', description: 'Xóa người dùng thất bại' });
+      playSound('error');
     }
+  };
+
+  const confirmDeleteUser = (record: User) => {
+    Modal.confirm({
+      title: <span style={{ fontSize: 20, fontWeight: 700 }}>Xác nhận xóa</span>,
+      icon: <ExclamationCircleOutlined />,
+      content: <div style={{ fontSize: 18 }}>Xóa người dùng "{record.username}" (ID: {record.userId})?</div>,
+      okText: 'Xóa', cancelText: 'Hủy', okButtonProps: { danger: true, size: 'large' }, cancelButtonProps: { size: 'large' }, centered: true,
+      onOk: async () => handleDeleteUser(record.userId),
+    });
   };
 
   const handleEdit = (user: User) => {
@@ -152,64 +185,114 @@ const UserManagement: React.FC = () => {
       dataIndex: 'username',
       key: 'username',
       sorter: (a: User, b: User) => a.username.localeCompare(b.username),
-      render: (text: string) => <Text strong>{text}</Text>,
+      render: (text: string) => (
+        <Tag
+          color="#e6f4ff"
+          style={{
+            color: '#1677ff',
+            fontSize: 16,
+            padding: '6px 14px',
+            borderRadius: 10,
+            border: '1px solid #91caff',
+            minWidth: 96,
+            textAlign: 'center',
+          }}
+        >
+          {text}
+        </Tag>
+      ),
     },
     {
       title: 'Email',
       dataIndex: 'email',
       key: 'email',
       sorter: (a: User, b: User) => a.email.localeCompare(b.email),
+      render: (text: string) => (
+        <Tag
+          color="#f6ffed"
+          style={{
+            color: '#389e0d',
+            fontSize: 14,
+            padding: '4px 10px',
+            borderRadius: 8,
+            border: '1px solid #b7eb8f',
+            maxWidth: 240,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }}
+        >
+          {text}
+        </Tag>
+      ),
     },
     {
       title: 'Phone',
       dataIndex: 'phone',
       key: 'phone',
-      render: (text: string) => text || '-',
+      render: (text: string) => (
+        <Tag
+          color="#fff7e6"
+          style={{
+            color: '#d46b08',
+            fontSize: 14,
+            padding: '4px 10px',
+            borderRadius: 8,
+            border: '1px solid #ffd591',
+          }}
+        >
+          {text || '-'}
+        </Tag>
+      ),
     },
     {
       title: 'Role',
       dataIndex: 'role',
       key: 'role',
       render: (role: UserRole) => (
-        <Tag color={role === UserRole.ADMIN ? 'red' : 'blue'}>
+        <Tag
+          color={role === UserRole.ADMIN ? '#fff1f0' : '#e6f4ff'}
+          style={{
+            color: role === UserRole.ADMIN ? '#cf1322' : '#1677ff',
+            fontSize: 14,
+            padding: '4px 12px',
+            borderRadius: 10,
+            border: `1px solid ${role === UserRole.ADMIN ? '#ffa39e' : '#91caff'}`,
+            minWidth: 90,
+            textAlign: 'center',
+          }}
+        >
           {role}
         </Tag>
       ),
     },
     {
-      title: 'Created At',
+      title: 'Ngày tạo',
       dataIndex: 'createdAt',
       key: 'createdAt',
       sorter: (a: User, b: User) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
       render: (date: string) => dayjs(date).format('DD/MM/YYYY HH:mm'),
     },
     {
-      title: 'Actions',
+      title: 'Thao tác',
       key: 'actions',
       width: 120,
       render: (_: any, record: User) => (
         <Space size="small">
-          <Tooltip title="Edit">
+          <Tooltip title="Sửa">
             <Button
               type="text"
               icon={<EditOutlined />}
               onClick={() => handleEdit(record)}
             />
           </Tooltip>
-          <Popconfirm
-            title="Are you sure you want to delete this user?"
-            onConfirm={() => handleDeleteUser(record.userId)}
-            okText="Yes"
-            cancelText="No"
-          >
-            <Tooltip title="Delete">
-              <Button
-                type="text"
-                danger
-                icon={<DeleteOutlined />}
-              />
-            </Tooltip>
-          </Popconfirm>
+          <Tooltip title="Xóa">
+            <Button
+              type="text"
+              danger
+              icon={<DeleteOutlined />}
+              onClick={() => confirmDeleteUser(record)}
+            />
+          </Tooltip>
         </Space>
       ),
     },

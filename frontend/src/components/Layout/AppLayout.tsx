@@ -12,6 +12,8 @@ import {
   BgColorsOutlined,
   ShoppingOutlined,
   FileTextOutlined,
+  AppstoreOutlined,
+  DeploymentUnitOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { USER_ROLES } from '../../utils/constants';
@@ -42,32 +44,42 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
     {
       key: '/dashboard',
       icon: <DashboardOutlined />,
-      label: 'Dashboard',
+      label: 'Bảng điều khiển',
     },
     {
       key: '/users',
       icon: <TeamOutlined />,
-      label: 'User Management',
+      label: 'Quản lý Người dùng',
     },
     {
       key: '/sizes',
       icon: <TagsOutlined />,
-      label: 'Size Management',
+      label: 'Quản lý Size',
     },
     {
       key: '/colors',
       icon: <BgColorsOutlined />,
-      label: 'Color Management',
+      label: 'Quản lý Màu sắc',
+    },
+    {
+      key: '/brands',
+      icon: <DeploymentUnitOutlined />,
+      label: 'Quản lý Thương hiệu',
+    },
+    {
+      key: '/categories',
+      icon: <AppstoreOutlined />,
+      label: 'Quản lý Danh mục',
     },
     {
       key: '/products',
       icon: <ShoppingOutlined />,
-      label: 'Product Management',
+      label: 'Quản lý Sản phẩm',
     },
     {
       key: '/orders',
       icon: <FileTextOutlined />,
-      label: 'Order Management',
+      label: 'Quản lý Đơn hàng',
     },
   ];
 
@@ -121,6 +133,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
         trigger={null} 
         collapsible 
         collapsed={collapsed}
+        width={260}
+        collapsedWidth={80}
         style={{
           background: colorBgContainer,
           boxShadow: '2px 0 8px rgba(0,0,0,0.1)',
@@ -136,13 +150,22 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
             {collapsed ? 'CS' : 'Clothing Store'}
           </Text>
         </div>
-        <Menu
-          mode="inline"
-          selectedKeys={[location.pathname]}
-          items={menuItems}
-          onClick={handleMenuClick}
-          style={{ border: 'none' }}
-        />
+        <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100% - 64px)' }}>
+          <Menu
+            mode="inline"
+            selectedKeys={[location.pathname]}
+            items={menuItems.map(item => ({
+              ...item,
+              label: <span style={{ display: 'inline-block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: collapsed ? 0 : 180 }}>{item.label as string}</span>,
+            }))}
+            onClick={handleMenuClick}
+            style={{ border: 'none', fontSize: 14, paddingInline: 8, flex: 1, overflowY: 'auto' }}
+          />
+          <div style={{ padding: '12px 16px', borderTop: '1px solid #f0f0f0', color: '#8c8c8c' }}>
+            <div style={{ fontSize: 12 }}>Phiên bản 1.0.0</div>
+            <div style={{ fontSize: 12 }}>© Clothing Store</div>
+          </div>
+        </div>
       </Sider>
       <Layout>
         <Header style={{ 

@@ -15,6 +15,7 @@ import {
   Statistic,
   Tooltip,
   ColorPicker,
+  Tag,
 } from 'antd';
 import {
   PlusOutlined,
@@ -68,13 +69,25 @@ const ColorManagement: React.FC = () => {
   const updateColorMutation = useMutation(colorApi.updateColor);
   const deleteColorMutation = useMutation(colorApi.deleteColor);
 
+  // Validation helpers
+  const isColorNameTaken = async (name: string, excludeId?: number) => {
+    try {
+      const found = await colorApi.getColorByName(name);
+      if (!found) return false;
+      if (excludeId && found.colorId === excludeId) return false;
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
   const handleCreateColor = async (values: CreateColorRequest) => {
     Modal.confirm({
-      title: <span style={{ fontSize: 20, fontWeight: 700 }}>Confirm create color</span>,
+      title: <span style={{ fontSize: 20, fontWeight: 700 }}>Xác nhận tạo màu</span>,
       icon: <ExclamationCircleOutlined />,
-      content: <div style={{ fontSize: 18 }}>Create color "{values.colorName}"?</div>,
-      okText: 'Create',
-      cancelText: 'Cancel',
+      content: <div style={{ fontSize: 18 }}>Tạo màu "{values.colorName}"?</div>,
+      okText: 'Tạo',
+      cancelText: 'Hủy',
       okButtonProps: { size: 'large', type: 'primary' },
       cancelButtonProps: { size: 'large' },
       onOk: async () => {
@@ -82,7 +95,7 @@ const ColorManagement: React.FC = () => {
         try {
           const result = await createColorMutation.mutate(values);
           if (result) {
-            notification.success({ message: <span style={{ fontSize: 20, fontWeight: 600 }}>Success</span>, description: <div style={{ fontSize: 18 }}>Color created successfully</div>, duration: 1.8, placement: 'top', style: { padding: 12 } });
+            notification.success({ message: 'Thành công', description: 'Tạo màu thành công' });
             playSound('success');
             setIsModalVisible(false);
             form.resetFields();
@@ -90,7 +103,7 @@ const ColorManagement: React.FC = () => {
             fetchColors();
           }
         } catch (error) {
-          notification.error({ message: <span style={{ fontSize: 20, fontWeight: 600 }}>Error</span>, description: <div style={{ fontSize: 18 }}>Failed to create color</div>, duration: 2.2, placement: 'top', style: { padding: 12 } });
+          notification.error({ message: 'Lỗi', description: 'Tạo màu thất bại' });
           playSound('error');
         }
       },
@@ -100,11 +113,11 @@ const ColorManagement: React.FC = () => {
   const handleUpdateColor = async (values: UpdateColorRequest) => {
     if (!editingColor) return;
     Modal.confirm({
-      title: <span style={{ fontSize: 20, fontWeight: 700 }}>Confirm update color</span>,
+      title: <span style={{ fontSize: 20, fontWeight: 700 }}>Xác nhận cập nhật màu</span>,
       icon: <ExclamationCircleOutlined />,
-      content: <div style={{ fontSize: 18 }}>Update color to "{values.colorName}"?</div>,
-      okText: 'Update',
-      cancelText: 'Cancel',
+      content: <div style={{ fontSize: 18 }}>Cập nhật thành "{values.colorName}"?</div>,
+      okText: 'Cập nhật',
+      cancelText: 'Hủy',
       okButtonProps: { size: 'large', type: 'primary' },
       cancelButtonProps: { size: 'large' },
       onOk: async () => {
@@ -112,7 +125,7 @@ const ColorManagement: React.FC = () => {
         try {
           const result = await updateColorMutation.mutate(editingColor.colorId, values);
           if (result) {
-            notification.success({ message: <span style={{ fontSize: 20, fontWeight: 600 }}>Success</span>, description: <div style={{ fontSize: 18 }}>Color updated successfully</div>, duration: 1.8, placement: 'top', style: { padding: 12 } });
+            notification.success({ message: 'Thành công', description: 'Cập nhật màu thành công' });
             playSound('success');
             setIsModalVisible(false);
             setEditingColor(null);
@@ -121,7 +134,7 @@ const ColorManagement: React.FC = () => {
             fetchColors();
           }
         } catch (error) {
-          notification.error({ message: <span style={{ fontSize: 20, fontWeight: 600 }}>Error</span>, description: <div style={{ fontSize: 18 }}>Failed to update color</div>, duration: 2.2, placement: 'top', style: { padding: 12 } });
+          notification.error({ message: 'Lỗi', description: 'Cập nhật màu thất bại' });
           playSound('error');
         }
       },
@@ -131,14 +144,14 @@ const ColorManagement: React.FC = () => {
   const handleDeleteColor = async (colorId: number) => {
     try {
       await deleteColorMutation.mutate(colorId);
-      notification.success({ message: <span style={{ fontSize: 20, fontWeight: 600 }}>Success</span>, description: <div style={{ fontSize: 18 }}>Color deleted successfully</div>, duration: 1.8, placement: 'top', style: { padding: 12 } });
+      notification.success({ message: 'Thành công', description: 'Xóa màu thành công' });
       playSound('success');
       // Optimistic update
       setColors(prev => prev.filter(c => c.colorId !== colorId));
       // Background refresh to stay in sync
       fetchColors();
     } catch (error) {
-      notification.error({ message: <span style={{ fontSize: 20, fontWeight: 600 }}>Error</span>, description: <div style={{ fontSize: 18 }}>Failed to delete color</div>, duration: 2.2, placement: 'top', style: { padding: 12 } });
+      notification.error({ message: 'Lỗi', description: 'Xóa màu thất bại' });
       playSound('error');
     }
   };
@@ -198,11 +211,26 @@ const ColorManagement: React.FC = () => {
       sorter: (a: Color, b: Color) => a.colorId - b.colorId,
     },
     {
-      title: 'Color Name',
+      title: 'Tên màu',
       dataIndex: 'colorName',
       key: 'colorName',
       sorter: (a: Color, b: Color) => a.colorName.localeCompare(b.colorName),
-      render: (text: string) => <Text strong>{text}</Text>,
+      render: (text: string) => (
+        <Tag
+          color="#e6f4ff"
+          style={{
+            color: '#1677ff',
+            fontSize: 16,
+            padding: '6px 14px',
+            borderRadius: 10,
+            border: '1px solid #91caff',
+            minWidth: 64,
+            textAlign: 'center',
+          }}
+        >
+          {text}
+        </Tag>
+      ),
     },
     {
       title: 'Preview',
@@ -234,14 +262,14 @@ const ColorManagement: React.FC = () => {
       width: 120,
       render: (_: any, record: Color) => (
         <Space size="small">
-          <Tooltip title="Edit">
+          <Tooltip title="Sửa">
             <Button
               type="text"
               icon={<EditOutlined />}
               onClick={() => handleEdit(record)}
             />
           </Tooltip>
-          <Tooltip title="Delete">
+          <Tooltip title="Xóa">
             <Button
               type="text"
               danger
@@ -298,16 +326,16 @@ const ColorManagement: React.FC = () => {
           <Row gutter={[16, 16]} align="middle">
             <Col flex="auto">
               <Title level={4} style={{ margin: 0 }}>
-                Color Management
+                Quản lý Màu sắc
               </Title>
               <Text type="secondary">
-                Manage product colors for your clothing store
+                Quản lý danh sách màu sắc sản phẩm
               </Text>
             </Col>
             <Col>
               <Space>
                 <Input
-                  placeholder="Search colors..."
+                  placeholder="Tìm kiếm màu..."
                   prefix={<SearchOutlined />}
                   value={searchText}
                   onChange={(e) => setSearchText(e.target.value)}
@@ -318,17 +346,17 @@ const ColorManagement: React.FC = () => {
                   onClick={fetchColors}
                   loading={loading}
                 >
-                  Refresh
+                  Làm mới
                 </Button>
                 <Button
                   type="primary"
                   icon={<PlusOutlined />}
                   onClick={() => setIsModalVisible(true)}
                 >
-                  Add Color
+                  Thêm Màu
                 </Button>
                 <Button icon={<ExportOutlined />}>
-                  Export
+                  Xuất
                 </Button>
               </Space>
             </Col>
@@ -351,7 +379,7 @@ const ColorManagement: React.FC = () => {
       </Card>
 
       <Modal
-        title={<span style={{ fontSize: 22, fontWeight: 700 }}>{editingColor ? 'Edit Color' : 'Add New Color'}</span>}
+        title={<span style={{ fontSize: 22, fontWeight: 700 }}>{editingColor ? 'Sửa Màu' : 'Thêm Màu mới'}</span>}
         open={isModalVisible}
         onCancel={handleModalClose}
         footer={null}
@@ -366,11 +394,27 @@ const ColorManagement: React.FC = () => {
         >
           <Form.Item
             name="colorName"
-            label="Color Name"
-            rules={[VALIDATION_RULES.REQUIRED, VALIDATION_RULES.COLOR_NAME]}
+            label="Tên màu"
+            rules={[
+              VALIDATION_RULES.REQUIRED,
+              VALIDATION_RULES.COLOR_NAME,
+              {
+                pattern: new RegExp('^[\\\p{L}\\\p{N}\\- ]+$','u'),
+                message: 'Chỉ cho phép chữ (có dấu), số, khoảng trắng và -',
+              },
+              {
+                validator: async (_, value) => {
+                  const val = (value || '').toString().trim().toLowerCase();
+                  if (!val) return Promise.resolve();
+                  const taken = await isColorNameTaken(val, editingColor?.colorId);
+                  if (taken) return Promise.reject(new Error('Màu đã tồn tại'));
+                  return Promise.resolve();
+                },
+              },
+            ]}
           >
             <Input 
-              placeholder="Enter color name (e.g., Red, Blue, Black)" 
+              placeholder="Nhập tên màu (VD: đỏ, xanh, đen)" 
               style={{ textTransform: 'capitalize' }}
               onChange={(e) => {
                 e.target.value = e.target.value.toLowerCase();
@@ -406,7 +450,7 @@ const ColorManagement: React.FC = () => {
           <Form.Item style={{ marginBottom: 0, textAlign: 'right' }}>
             <Space>
               <Button size="large" onClick={handleModalClose}>
-                Cancel
+                Hủy
               </Button>
               <Button
                 type="primary"
@@ -414,7 +458,7 @@ const ColorManagement: React.FC = () => {
                 size="large"
                 loading={createColorMutation.isLoading || updateColorMutation.isLoading}
               >
-                {editingColor ? 'Update' : 'Create'}
+                {editingColor ? 'Cập nhật' : 'Tạo'}
               </Button>
             </Space>
           </Form.Item>

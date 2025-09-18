@@ -10,7 +10,8 @@ import {
   Color,
   CreateColorRequest,
   UpdateColorRequest,
-  PaginatedResponse,
+  Brand,
+  Category,
   FilterOptions
 } from '../types';
 
@@ -118,8 +119,12 @@ export const sizeApi = {
   },
 
   // Get size by name
-  getSizeByName: async (name: string): Promise<Size> => {
-    const response = await api.get(`/sizes/name/${name}`);
+  getSizeByName: async (name: string): Promise<Size | null> => {
+    const encoded = encodeURIComponent(name);
+    const response = await api.get(`/sizes/name/${encoded}`, {
+      validateStatus: (status) => (status >= 200 && status < 300) || status === 404,
+    });
+    if (response.status === 404) return null;
     return response.data;
   },
 
@@ -162,8 +167,12 @@ export const colorApi = {
   },
 
   // Get color by name
-  getColorByName: async (name: string): Promise<Color> => {
-    const response = await api.get(`/colors/name/${name}`);
+  getColorByName: async (name: string): Promise<Color | null> => {
+    const encoded = encodeURIComponent(name);
+    const response = await api.get(`/colors/name/${encoded}`, {
+      validateStatus: (status) => (status >= 200 && status < 300) || status === 404,
+    });
+    if (response.status === 404) return null;
     return response.data;
   },
 
@@ -188,6 +197,68 @@ export const colorApi = {
   getColorCount: async (): Promise<number> => {
     const response = await api.get('/colors/count');
     return response.data;
+  },
+};
+
+// Brand API
+export const brandApi = {
+  getBrands: async (): Promise<Brand[]> => {
+    const response = await api.get('/brands');
+    return response.data;
+  },
+  getBrandById: async (id: number): Promise<Brand> => {
+    const response = await api.get(`/brands/${id}`);
+    return response.data;
+  },
+  getBrandByName: async (name: string): Promise<Brand | null> => {
+    const encoded = encodeURIComponent(name);
+    const response = await api.get(`/brands/name/${encoded}`, {
+      validateStatus: (s) => (s >= 200 && s < 300) || s === 404,
+    });
+    if (response.status === 404) return null;
+    return response.data;
+  },
+  createBrand: async (data: { brandName: string; logoUrl?: string; description?: string; website?: string; }): Promise<Brand> => {
+    const response = await api.post('/brands', data);
+    return response.data;
+  },
+  updateBrand: async (id: number, data: { brandName: string; logoUrl?: string; description?: string; website?: string; }): Promise<Brand> => {
+    const response = await api.put(`/brands/${id}`, data);
+    return response.data;
+  },
+  deleteBrand: async (id: number): Promise<void> => {
+    await api.delete(`/brands/${id}`);
+  },
+};
+
+// Category API
+export const categoryApi = {
+  getCategories: async (): Promise<Category[]> => {
+    const response = await api.get('/categories');
+    return response.data;
+  },
+  getCategoryById: async (id: number): Promise<Category> => {
+    const response = await api.get(`/categories/${id}`);
+    return response.data;
+  },
+  getCategoryByName: async (name: string): Promise<Category | null> => {
+    const encoded = encodeURIComponent(name);
+    const response = await api.get(`/categories/name/${encoded}`, {
+      validateStatus: (s) => (s >= 200 && s < 300) || s === 404,
+    });
+    if (response.status === 404) return null;
+    return response.data;
+  },
+  createCategory: async (data: { categoryName: string; parentId?: number; description?: string; imageUrl?: string; }): Promise<Category> => {
+    const response = await api.post('/categories', data);
+    return response.data;
+  },
+  updateCategory: async (id: number, data: { categoryName: string; parentId?: number; description?: string; imageUrl?: string; }): Promise<Category> => {
+    const response = await api.put(`/categories/${id}`, data);
+    return response.data;
+  },
+  deleteCategory: async (id: number): Promise<void> => {
+    await api.delete(`/categories/${id}`);
   },
 };
 

@@ -6,6 +6,8 @@ import Dashboard from './pages/Dashboard';
 import UserManagement from './components/UserManagement/UserManagement';
 import SizeManagement from './components/SizeManagement/SizeManagement';
 import ColorManagement from './components/ColorManagement/ColorManagement';
+import BrandManagement from './components/BrandManagement/BrandManagement';
+import CategoryManagement from './components/CategoryManagement/CategoryManagement';
 
 // Configure Ant Design theme
 const antdTheme = {
@@ -46,6 +48,8 @@ const App: React.FC = () => {
             <Route path="/users" element={<UserManagement />} />
             <Route path="/sizes" element={<SizeManagement />} />
             <Route path="/colors" element={<ColorManagement />} />
+            <Route path="/brands" element={<BrandManagement />} />
+            <Route path="/categories" element={<CategoryManagement />} />
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
         </AppLayout>
