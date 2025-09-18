@@ -8,7 +8,7 @@ import {
   Modal,
   Form,
   message,
-  Popconfirm,
+  notification,
   Typography,
   Row,
   Col,
@@ -24,12 +24,13 @@ import {
   BgColorsOutlined,
   ReloadOutlined,
   ExportOutlined,
+  ExclamationCircleOutlined,
 } from '@ant-design/icons';
 import { colorApi } from '../../services/api';
 import { Color, CreateColorRequest, UpdateColorRequest } from '../../types';
 import { PAGINATION_CONFIG, VALIDATION_RULES, COMMON_COLORS } from '../../utils/constants';
 import { useMutation } from '../../hooks/useApi';
-import dayjs from 'dayjs';
+import { playSound } from '../../utils/sound';
 
 const { Title, Text } = Typography;
 
@@ -68,49 +69,92 @@ const ColorManagement: React.FC = () => {
   const deleteColorMutation = useMutation(colorApi.deleteColor);
 
   const handleCreateColor = async (values: CreateColorRequest) => {
-    try {
-      const result = await createColorMutation.mutate(values);
-      if (result) {
-        message.success('Color created successfully');
-        setIsModalVisible(false);
-        form.resetFields();
-        setSelectedColor('#1890ff');
-        fetchColors();
-      }
-    } catch (error) {
-      message.error('Failed to create color');
-    }
+    Modal.confirm({
+      title: <span style={{ fontSize: 20, fontWeight: 700 }}>Confirm create color</span>,
+      icon: <ExclamationCircleOutlined />,
+      content: <div style={{ fontSize: 18 }}>Create color "{values.colorName}"?</div>,
+      okText: 'Create',
+      cancelText: 'Cancel',
+      okButtonProps: { size: 'large', type: 'primary' },
+      cancelButtonProps: { size: 'large' },
+      onOk: async () => {
+        playSound('confirm');
+        try {
+          const result = await createColorMutation.mutate(values);
+          if (result) {
+            notification.success({ message: <span style={{ fontSize: 20, fontWeight: 600 }}>Success</span>, description: <div style={{ fontSize: 18 }}>Color created successfully</div>, duration: 1.8, placement: 'top', style: { padding: 12 } });
+            playSound('success');
+            setIsModalVisible(false);
+            form.resetFields();
+            setSelectedColor('#1890ff');
+            fetchColors();
+          }
+        } catch (error) {
+          notification.error({ message: <span style={{ fontSize: 20, fontWeight: 600 }}>Error</span>, description: <div style={{ fontSize: 18 }}>Failed to create color</div>, duration: 2.2, placement: 'top', style: { padding: 12 } });
+          playSound('error');
+        }
+      },
+    });
   };
 
   const handleUpdateColor = async (values: UpdateColorRequest) => {
     if (!editingColor) return;
-    
-    try {
-      const result = await updateColorMutation.mutate(editingColor.colorId, values);
-      if (result) {
-        message.success('Color updated successfully');
-        setIsModalVisible(false);
-        setEditingColor(null);
-        form.resetFields();
-        setSelectedColor('#1890ff');
-        fetchColors();
-      }
-    } catch (error) {
-      message.error('Failed to update color');
-    }
+    Modal.confirm({
+      title: <span style={{ fontSize: 20, fontWeight: 700 }}>Confirm update color</span>,
+      icon: <ExclamationCircleOutlined />,
+      content: <div style={{ fontSize: 18 }}>Update color to "{values.colorName}"?</div>,
+      okText: 'Update',
+      cancelText: 'Cancel',
+      okButtonProps: { size: 'large', type: 'primary' },
+      cancelButtonProps: { size: 'large' },
+      onOk: async () => {
+        playSound('confirm');
+        try {
+          const result = await updateColorMutation.mutate(editingColor.colorId, values);
+          if (result) {
+            notification.success({ message: <span style={{ fontSize: 20, fontWeight: 600 }}>Success</span>, description: <div style={{ fontSize: 18 }}>Color updated successfully</div>, duration: 1.8, placement: 'top', style: { padding: 12 } });
+            playSound('success');
+            setIsModalVisible(false);
+            setEditingColor(null);
+            form.resetFields();
+            setSelectedColor('#1890ff');
+            fetchColors();
+          }
+        } catch (error) {
+          notification.error({ message: <span style={{ fontSize: 20, fontWeight: 600 }}>Error</span>, description: <div style={{ fontSize: 18 }}>Failed to update color</div>, duration: 2.2, placement: 'top', style: { padding: 12 } });
+          playSound('error');
+        }
+      },
+    });
   };
 
   const handleDeleteColor = async (colorId: number) => {
     try {
       await deleteColorMutation.mutate(colorId);
-      message.success('Color deleted successfully');
+      notification.success({ message: <span style={{ fontSize: 20, fontWeight: 600 }}>Success</span>, description: <div style={{ fontSize: 18 }}>Color deleted successfully</div>, duration: 1.8, placement: 'top', style: { padding: 12 } });
+      playSound('success');
       // Optimistic update
       setColors(prev => prev.filter(c => c.colorId !== colorId));
       // Background refresh to stay in sync
       fetchColors();
     } catch (error) {
-      message.error('Failed to delete color');
+      notification.error({ message: <span style={{ fontSize: 20, fontWeight: 600 }}>Error</span>, description: <div style={{ fontSize: 18 }}>Failed to delete color</div>, duration: 2.2, placement: 'top', style: { padding: 12 } });
+      playSound('error');
     }
+  };
+
+  const confirmDeleteColor = (record: Color) => {
+    Modal.confirm({
+      title: <span style={{ fontSize: 20, fontWeight: 700 }}>Confirm delete</span>,
+      icon: <ExclamationCircleOutlined />,
+      content: <div style={{ fontSize: 18 }}>Delete color "{record.colorName}" (ID: {record.colorId})?</div>,
+      okText: 'Delete',
+      cancelText: 'Cancel',
+      okButtonProps: { danger: true, size: 'large' },
+      cancelButtonProps: { size: 'large' },
+      centered: true,
+      onOk: async () => handleDeleteColor(record.colorId),
+    });
   };
 
   const handleEdit = (color: Color) => {
@@ -197,20 +241,14 @@ const ColorManagement: React.FC = () => {
               onClick={() => handleEdit(record)}
             />
           </Tooltip>
-          <Popconfirm
-            title="Are you sure you want to delete this color?"
-            onConfirm={() => handleDeleteColor(record.colorId)}
-            okText="Yes"
-            cancelText="No"
-          >
-            <Tooltip title="Delete">
-              <Button
-                type="text"
-                danger
-                icon={<DeleteOutlined />}
-              />
-            </Tooltip>
-          </Popconfirm>
+          <Tooltip title="Delete">
+            <Button
+              type="text"
+              danger
+              icon={<DeleteOutlined />}
+              onClick={() => confirmDeleteColor(record)}
+            />
+          </Tooltip>
         </Space>
       ),
     },
@@ -313,11 +351,13 @@ const ColorManagement: React.FC = () => {
       </Card>
 
       <Modal
-        title={editingColor ? 'Edit Color' : 'Add New Color'}
+        title={<span style={{ fontSize: 22, fontWeight: 700 }}>{editingColor ? 'Edit Color' : 'Add New Color'}</span>}
         open={isModalVisible}
         onCancel={handleModalClose}
         footer={null}
-        width={600}
+        width={820}
+        centered
+        styles={{ body: { paddingTop: 16, paddingBottom: 12 } }}
       >
         <Form
           form={form}
@@ -365,12 +405,13 @@ const ColorManagement: React.FC = () => {
 
           <Form.Item style={{ marginBottom: 0, textAlign: 'right' }}>
             <Space>
-              <Button onClick={handleModalClose}>
+              <Button size="large" onClick={handleModalClose}>
                 Cancel
               </Button>
               <Button
                 type="primary"
                 htmlType="submit"
+                size="large"
                 loading={createColorMutation.isLoading || updateColorMutation.isLoading}
               >
                 {editingColor ? 'Update' : 'Create'}

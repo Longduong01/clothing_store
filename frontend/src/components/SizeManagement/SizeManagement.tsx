@@ -8,7 +8,7 @@ import {
   Modal,
   Form,
   message,
-  Popconfirm,
+  notification,
   Typography,
   Row,
   Col,
@@ -24,12 +24,13 @@ import {
   TagsOutlined,
   ReloadOutlined,
   ExportOutlined,
+  ExclamationCircleOutlined,
 } from '@ant-design/icons';
 import { sizeApi } from '../../services/api';
 import { Size, CreateSizeRequest, UpdateSizeRequest } from '../../types';
 import { PAGINATION_CONFIG, VALIDATION_RULES } from '../../utils/constants';
 import { useMutation } from '../../hooks/useApi';
-import dayjs from 'dayjs';
+import { playSound } from '../../utils/sound';
 
 const { Title, Text } = Typography;
 
@@ -67,48 +68,91 @@ const SizeManagement: React.FC = () => {
   const deleteSizeMutation = useMutation(sizeApi.deleteSize);
 
   const handleCreateSize = async (values: CreateSizeRequest) => {
-    try {
-      const result = await createSizeMutation.mutate(values);
-      if (result) {
-        message.success('Size created successfully');
-        setIsModalVisible(false);
-        form.resetFields();
-        fetchSizes();
-      }
-    } catch (error) {
-      console.error('Create Error:', error);
-      message.error('Failed to create size in database');
-    }
+    Modal.confirm({
+      title: <span style={{ fontSize: 20, fontWeight: 700 }}>Confirm create size</span>,
+      icon: <ExclamationCircleOutlined />,
+      content: <div style={{ fontSize: 18 }}>Create size "{values.sizeName}"?</div>,
+      okText: 'Create',
+      cancelText: 'Cancel',
+      okButtonProps: { size: 'large', type: 'primary' },
+      cancelButtonProps: { size: 'large' },
+      onOk: async () => {
+        playSound('confirm');
+        try {
+          const result = await createSizeMutation.mutate(values);
+          if (result) {
+            notification.success({ message: <span style={{ fontSize: 20, fontWeight: 600 }}>Success</span>, description: <div style={{ fontSize: 18 }}>Size created successfully</div>, duration: 1.8, placement: 'top', style: { padding: 12 } });
+            playSound('success');
+            setIsModalVisible(false);
+            form.resetFields();
+            fetchSizes();
+          }
+        } catch (error) {
+          console.error('Create Error:', error);
+          notification.error({ message: <span style={{ fontSize: 20, fontWeight: 600 }}>Error</span>, description: <div style={{ fontSize: 18 }}>Failed to create size in database</div>, duration: 2.2, placement: 'top', style: { padding: 12 } });
+          playSound('error');
+        }
+      },
+    });
   };
 
   const handleUpdateSize = async (values: UpdateSizeRequest) => {
     if (!editingSize) return;
-    
-    try {
-      const result = await updateSizeMutation.mutate(editingSize.sizeId, values);
-      if (result) {
-        message.success('Size updated successfully');
-        setIsModalVisible(false);
-        setEditingSize(null);
-        form.resetFields();
-        fetchSizes();
-      }
-    } catch (error) {
-      message.error('Failed to update size');
-    }
+    Modal.confirm({
+      title: <span style={{ fontSize: 20, fontWeight: 700 }}>Confirm update size</span>,
+      icon: <ExclamationCircleOutlined />,
+      content: <div style={{ fontSize: 18 }}>Update size to "{values.sizeName}"?</div>,
+      okText: 'Update',
+      cancelText: 'Cancel',
+      okButtonProps: { size: 'large', type: 'primary' },
+      cancelButtonProps: { size: 'large' },
+      onOk: async () => {
+        playSound('confirm');
+        try {
+          const result = await updateSizeMutation.mutate(editingSize.sizeId, values);
+          if (result) {
+            notification.success({ message: <span style={{ fontSize: 20, fontWeight: 600 }}>Success</span>, description: <div style={{ fontSize: 18 }}>Size updated successfully</div>, duration: 1.8, placement: 'top', style: { padding: 12 } });
+            playSound('success');
+            setIsModalVisible(false);
+            setEditingSize(null);
+            form.resetFields();
+            fetchSizes();
+          }
+        } catch (error) {
+          notification.error({ message: <span style={{ fontSize: 20, fontWeight: 600 }}>Error</span>, description: <div style={{ fontSize: 18 }}>Failed to update size</div>, duration: 2.2, placement: 'top', style: { padding: 12 } });
+          playSound('error');
+        }
+      },
+    });
   };
 
   const handleDeleteSize = async (sizeId: number) => {
     try {
       await deleteSizeMutation.mutate(sizeId);
-      message.success('Size deleted successfully');
+      notification.success({ message: <span style={{ fontSize: 20, fontWeight: 600 }}>Success</span>, description: <div style={{ fontSize: 18 }}>Size deleted successfully</div>, duration: 1.8, placement: 'top', style: { padding: 12 } });
+      playSound('success');
       // Optimistic update
       setSizes(prev => prev.filter(s => s.sizeId !== sizeId));
       // Background refresh to stay in sync
       fetchSizes();
     } catch (error) {
-      message.error('Failed to delete size');
+      notification.error({ message: <span style={{ fontSize: 20, fontWeight: 600 }}>Error</span>, description: <div style={{ fontSize: 18 }}>Failed to delete size</div>, duration: 2.2, placement: 'top', style: { padding: 12 } });
+      playSound('error');
     }
+  };
+
+  const confirmDeleteSize = (record: Size) => {
+    Modal.confirm({
+      title: <span style={{ fontSize: 20, fontWeight: 700 }}>Confirm delete</span>,
+      icon: <ExclamationCircleOutlined />,
+      content: <div style={{ fontSize: 18 }}>Delete size "{record.sizeName}" (ID: {record.sizeId})?</div>,
+      okText: 'Delete',
+      cancelText: 'Cancel',
+      okButtonProps: { danger: true, size: 'large' },
+      cancelButtonProps: { size: 'large' },
+      centered: true,
+      onOk: async () => handleDeleteSize(record.sizeId),
+    });
   };
 
   const handleEdit = (size: Size) => {
@@ -160,20 +204,14 @@ const SizeManagement: React.FC = () => {
               onClick={() => handleEdit(record)}
             />
           </Tooltip>
-          <Popconfirm
-            title="Are you sure you want to delete this size?"
-            onConfirm={() => handleDeleteSize(record.sizeId)}
-            okText="Yes"
-            cancelText="No"
-          >
-            <Tooltip title="Delete">
-              <Button
-                type="text"
-                danger
-                icon={<DeleteOutlined />}
-              />
-            </Tooltip>
-          </Popconfirm>
+          <Tooltip title="Delete">
+            <Button
+              type="text"
+              danger
+              icon={<DeleteOutlined />}
+              onClick={() => confirmDeleteSize(record)}
+            />
+          </Tooltip>
         </Space>
       ),
     },
@@ -276,11 +314,13 @@ const SizeManagement: React.FC = () => {
       </Card>
 
       <Modal
-        title={editingSize ? 'Edit Size' : 'Add New Size'}
+        title={<span style={{ fontSize: 22, fontWeight: 700 }}>{editingSize ? 'Edit Size' : 'Add New Size'}</span>}
         open={isModalVisible}
         onCancel={handleModalClose}
         footer={null}
-        width={500}
+        width={720}
+        centered
+        styles={{ body: { paddingTop: 16, paddingBottom: 12 } }}
       >
         <Form
           form={form}
@@ -303,12 +343,13 @@ const SizeManagement: React.FC = () => {
 
           <Form.Item style={{ marginBottom: 0, textAlign: 'right' }}>
             <Space>
-              <Button onClick={handleModalClose}>
+              <Button size="large" onClick={handleModalClose}>
                 Cancel
               </Button>
               <Button
                 type="primary"
                 htmlType="submit"
+                size="large"
                 loading={createSizeMutation.isLoading || updateSizeMutation.isLoading}
               >
                 {editingSize ? 'Update' : 'Create'}
