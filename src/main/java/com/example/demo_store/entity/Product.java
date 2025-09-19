@@ -87,6 +87,6 @@ public class Product {
     private LocalDateTime updatedAt;
     
     public enum ProductStatus {
-        ACTIVE, INACTIVE, OUT_OF_STOCK
+        ACTIVE, INACTIVE, OUT_OF_STOCK, DISCONTINUED
     }
 }

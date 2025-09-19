@@ -4,6 +4,7 @@ import {
   User, 
   CreateUserRequest, 
   UpdateUserRequest,
+  Product,
   Size,
   CreateSizeRequest,
   UpdateSizeRequest,
@@ -259,6 +260,37 @@ export const categoryApi = {
   },
   deleteCategory: async (id: number): Promise<void> => {
     await api.delete(`/categories/${id}`);
+  },
+};
+
+// Product API
+export const productApi = {
+  getProducts: async (): Promise<Product[]> => {
+    const response = await api.get('/products');
+    return response.data;
+  },
+  getProductById: async (id: number): Promise<Product> => {
+    const response = await api.get(`/products/${id}`);
+    return response.data;
+  },
+  getProductByName: async (name: string): Promise<Product | null> => {
+    const encoded = encodeURIComponent(name);
+    const response = await api.get(`/products/name/${encoded}`, {
+      validateStatus: (s) => (s >= 200 && s < 300) || s === 404,
+    });
+    if (response.status === 404) return null;
+    return response.data;
+  },
+  createProduct: async (data: Partial<Product>): Promise<Product> => {
+    const response = await api.post('/products', data);
+    return response.data;
+  },
+  updateProduct: async (id: number, data: Partial<Product>): Promise<Product> => {
+    const response = await api.put(`/products/${id}`, data);
+    return response.data;
+  },
+  deleteProduct: async (id: number): Promise<void> => {
+    await api.delete(`/products/${id}`);
   },
 };
 

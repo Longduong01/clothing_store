@@ -40,13 +40,15 @@ public class ProductController {
     @Autowired
     private ProductImageService productImageService;
     
-    // GET /api/products - Lấy tất cả products
+    // GET /api/products - Lấy tất cả products (trả về DTO gọn tránh lỗi serialize)
     @GetMapping
-    public ResponseEntity<List<Product>> getAllProducts() {
+    public ResponseEntity<List<ProductDto>> getAllProducts() {
         try {
             List<Product> products = productRepository.findAll();
-            return ResponseEntity.ok(products);
+            List<ProductDto> dtos = products.stream().map(ProductDto::fromEntity).toList();
+            return ResponseEntity.ok(dtos);
         } catch (Exception e) {
+            e.printStackTrace();
             return ResponseEntity.status(500).build();
         }
     }
@@ -65,12 +67,27 @@ public class ProductController {
     
     // GET /api/products/sku/{sku} - Lấy product theo SKU
     @GetMapping("/sku/{sku}")
-    public ResponseEntity<Product> getProductBySku(@PathVariable String sku) {
+    public ResponseEntity<ProductDto> getProductBySku(@PathVariable String sku) {
         try {
             Optional<Product> product = productRepository.findBySku(sku);
-            return product.map(ResponseEntity::ok)
+            return product.map(p -> ResponseEntity.ok(ProductDto.fromEntity(p)))
                         .orElse(ResponseEntity.notFound().build());
         } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).build();
+        }
+    }
+
+    // GET /api/products/name/{name} - Lấy product theo tên (phục vụ unique check FE)
+    @GetMapping("/name/{name}")
+    public ResponseEntity<ProductDto> getProductByName(@PathVariable String name) {
+        try {
+            List<Product> products = productRepository.findByKeyword(name);
+            return products.stream().findFirst()
+                    .map(p -> ResponseEntity.ok(ProductDto.fromEntity(p)))
+                    .orElse(ResponseEntity.notFound().build());
+        } catch (Exception e) {
+            e.printStackTrace();
             return ResponseEntity.status(500).build();
         }
     }
@@ -183,7 +200,7 @@ public class ProductController {
     
     // PUT /api/products/{id} - Cập nhật product
     @PutMapping("/{id}")
-    public ResponseEntity<Product> updateProduct(@PathVariable Long id, @RequestBody Product productDetails) {
+    public ResponseEntity<ProductDto> updateProduct(@PathVariable Long id, @RequestBody Product productDetails) {
         try {
             Optional<Product> productOptional = productRepository.findById(id);
             if (productOptional.isPresent()) {
@@ -195,11 +212,12 @@ public class ProductController {
                 product.setStatus(productDetails.getStatus());
                 
                 Product updatedProduct = productRepository.save(product);
-                return ResponseEntity.ok(updatedProduct);
+                return ResponseEntity.ok(ProductDto.fromEntity(updatedProduct));
             } else {
                 return ResponseEntity.notFound().build();
             }
         } catch (Exception e) {
+            e.printStackTrace();
             return ResponseEntity.status(500).build();
         }
     }
@@ -451,4 +469,45 @@ public class ProductController {
         public List<Long> getImageIds() { return imageIds; }
         public void setImageIds(List<Long> imageIds) { this.imageIds = imageIds; }
     }
+}
+
+// DTO classes
+class ProductDto {
+    public Long productId;
+    public String productName;
+    public String description;
+    public String sku;
+    public Double price;
+    public Integer stockQuantity;
+    public String status;
+    public String imageUrl;
+    public String thumbnailUrl;
+    public SimpleRef brand;
+    public SimpleRef category;
+
+    public static ProductDto fromEntity(Product p) {
+        ProductDto dto = new ProductDto();
+        dto.productId = p.getProductId();
+        dto.productName = p.getProductName();
+        dto.description = p.getDescription();
+        dto.sku = p.getSku();
+        dto.price = p.getPrice() != null ? p.getPrice().doubleValue() : null;
+        dto.stockQuantity = p.getStockQuantity();
+        dto.status = p.getStatus() != null ? p.getStatus().name() : null;
+        dto.imageUrl = p.getImageUrl();
+        dto.thumbnailUrl = p.getThumbnailUrl();
+        if (p.getBrand() != null) {
+            dto.brand = new SimpleRef(p.getBrand().getBrandId(), p.getBrand().getBrandName());
+        }
+        if (p.getCategory() != null) {
+            dto.category = new SimpleRef(p.getCategory().getCategoryId(), p.getCategory().getCategoryName());
+        }
+        return dto;
+    }
+}
+
+class SimpleRef {
+    public Long id;
+    public String name;
+    public SimpleRef(Long id, String name) { this.id = id; this.name = name; }
 }

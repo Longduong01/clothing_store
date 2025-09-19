@@ -79,7 +79,8 @@ export interface Product extends BaseEntity {
 export enum ProductStatus {
   ACTIVE = 'ACTIVE',
   INACTIVE = 'INACTIVE',
-  OUT_OF_STOCK = 'OUT_OF_STOCK'
+  OUT_OF_STOCK = 'OUT_OF_STOCK',
+  DISCONTINUED = 'DISCONTINUED'
 }
 
 export interface Category extends BaseEntity {
