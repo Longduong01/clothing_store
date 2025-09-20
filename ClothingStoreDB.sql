@@ -61,7 +61,6 @@ CREATE TABLE Products (
     product_name NVARCHAR(200) NOT NULL,
     description NVARCHAR(MAX),
     sku NVARCHAR(50) NOT NULL UNIQUE,
-    price DECIMAL(18,2) NOT NULL,
     image_url NVARCHAR(500),
     thumbnail_url NVARCHAR(500),
     gallery_images NVARCHAR(MAX),
@@ -74,7 +73,6 @@ CREATE TABLE Products (
     CONSTRAINT FK_Products_Category FOREIGN KEY (category_id) REFERENCES Categories(category_id),
     CONSTRAINT FK_Products_Brand FOREIGN KEY (brand_id) REFERENCES Brands(brand_id),
     CONSTRAINT CHK_Products_Status CHECK (status IN ('ACTIVE', 'INACTIVE', 'DISCONTINUED')),
-    CONSTRAINT CHK_Products_Price CHECK (price >= 0),
     CONSTRAINT CHK_Products_StockQuantity CHECK (stock_quantity >= 0)
 );
 
@@ -94,6 +92,7 @@ CREATE TABLE Colors (
 CREATE TABLE ProductImages (
     image_id INT IDENTITY(1,1) PRIMARY KEY,
     product_id INT NOT NULL,
+    variant_id INT NULL,
     image_url NVARCHAR(500) NOT NULL,
     image_name NVARCHAR(255),
     image_type NVARCHAR(50),
@@ -104,6 +103,7 @@ CREATE TABLE ProductImages (
     updated_at DATETIME2 DEFAULT GETDATE(),
     
     CONSTRAINT FK_ProductImages_Product FOREIGN KEY (product_id) REFERENCES Products(product_id) ON DELETE CASCADE,
+    CONSTRAINT FK_ProductImages_Variant FOREIGN KEY (variant_id) REFERENCES ProductVariants(variant_id),
     CONSTRAINT CHK_ProductImages_FileSize CHECK (file_size > 0),
     CONSTRAINT CHK_ProductImages_SortOrder CHECK (sort_order >= 0)
 );
@@ -115,9 +115,11 @@ CREATE TABLE ProductVariants (
     product_id INT NOT NULL,
     size_id INT NOT NULL,
     color_id INT NOT NULL,
+    sku VARCHAR(100) NOT NULL UNIQUE,
     price DECIMAL(18,2) NOT NULL,
     stock INT NOT NULL DEFAULT 0,
     status NVARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
+    image_path NVARCHAR(500) NULL,
     created_at DATETIME2 DEFAULT GETDATE(),
     updated_at DATETIME2 DEFAULT GETDATE(),
     CONSTRAINT FK_ProductVariants_Product FOREIGN KEY (product_id) REFERENCES Products(product_id),
@@ -254,45 +256,45 @@ INSERT INTO Users (username, password, email, phone, role) VALUES
 ('customer2', 'customer123', 'customer2@email.com', '0912345678', 'CUSTOMER');
 
 -- Thêm Products
-INSERT INTO Products (product_name, description, sku, price, image_url, thumbnail_url, stock_quantity, category_id, brand_id) VALUES 
-('Áo thun Uniqlo Basic', 'Áo thun cotton 100% thoáng mát, thiết kế đơn giản', 'UNI001', 199000, 'https://via.placeholder.com/400x400/007bff/ffffff?text=Uniqlo+Basic', 'https://via.placeholder.com/400x400/007bff/ffffff?text=Uniqlo+Basic', 100, 3, 1),
-('Quần jean Nike Sport', 'Quần jean co giãn, phù hợp cho vận động', 'NIKE001', 599000, 'https://via.placeholder.com/400x400/28a745/ffffff?text=Nike+Sport', 'https://via.placeholder.com/400x400/28a745/ffffff?text=Nike+Sport', 50, 5, 2),
-('Áo sơ mi Zara Classic', 'Áo sơ mi công sở, chất liệu cotton cao cấp', 'ZARA001', 399000, 'https://via.placeholder.com/400x400/dc3545/ffffff?text=Zara+Classic', 'https://via.placeholder.com/400x400/dc3545/ffffff?text=Zara+Classic', 75, 4, 4),
-('Quần short Adidas', 'Quần short thể thao, thoáng khí', 'ADIDAS001', 299000, 'https://via.placeholder.com/400x400/ffc107/ffffff?text=Adidas+Short', 'https://via.placeholder.com/400x400/ffc107/ffffff?text=Adidas+Short', 80, 6, 3);
+INSERT INTO Products (product_name, description, sku, image_url, thumbnail_url, stock_quantity, category_id, brand_id) VALUES 
+('Áo thun Uniqlo Basic', 'Áo thun cotton 100% thoáng mát, thiết kế đơn giản', 'UNI001', 'https://via.placeholder.com/400x400/007bff/ffffff?text=Uniqlo+Basic', 'https://via.placeholder.com/400x400/007bff/ffffff?text=Uniqlo+Basic', 100, 3, 1),
+('Quần jean Nike Sport', 'Quần jean co giãn, phù hợp cho vận động', 'NIKE001', 'https://via.placeholder.com/400x400/28a745/ffffff?text=Nike+Sport', 'https://via.placeholder.com/400x400/28a745/ffffff?text=Nike+Sport', 50, 5, 2),
+('Áo sơ mi Zara Classic', 'Áo sơ mi công sở, chất liệu cotton cao cấp', 'ZARA001', 'https://via.placeholder.com/400x400/dc3545/ffffff?text=Zara+Classic', 'https://via.placeholder.com/400x400/dc3545/ffffff?text=Zara+Classic', 75, 4, 4),
+('Quần short Adidas', 'Quần short thể thao, thoáng khí', 'ADIDAS001', 'https://via.placeholder.com/400x400/ffc107/ffffff?text=Adidas+Short', 'https://via.placeholder.com/400x400/ffc107/ffffff?text=Adidas+Short', 80, 6, 3);
 
--- Thêm ProductVariants
-INSERT INTO ProductVariants (product_id, size_id, color_id, price, stock) VALUES 
+-- Thêm ProductVariants với SKU
+INSERT INTO ProductVariants (product_id, size_id, color_id, sku, price, stock) VALUES 
 -- Áo thun Uniqlo Basic
-(1, 1, 3, 199000, 50),  -- S Black
-(1, 2, 3, 199000, 50),  -- M Black
-(1, 3, 3, 199000, 50),  -- L Black
-(1, 1, 4, 199000, 30),  -- S White
-(1, 2, 4, 199000, 30),  -- M White
-(1, 3, 4, 199000, 30),  -- L White
-(1, 2, 1, 199000, 25),  -- M Red
-(1, 3, 1, 199000, 25),  -- L Red
+(1, 1, 3, 'UNI001-BLACK-S', 199000, 50),  -- S Black
+(1, 2, 3, 'UNI001-BLACK-M', 199000, 50),  -- M Black
+(1, 3, 3, 'UNI001-BLACK-L', 199000, 50),  -- L Black
+(1, 1, 4, 'UNI001-WHITE-S', 199000, 30),  -- S White
+(1, 2, 4, 'UNI001-WHITE-M', 199000, 30),  -- M White
+(1, 3, 4, 'UNI001-WHITE-L', 199000, 30),  -- L White
+(1, 2, 1, 'UNI001-RED-M', 199000, 25),  -- M Red
+(1, 3, 1, 'UNI001-RED-L', 199000, 25),  -- L Red
 
 -- Quần jean Nike Sport
-(2, 2, 3, 599000, 40),  -- M Black
-(2, 3, 3, 599000, 40),  -- L Black
-(2, 4, 3, 599000, 40),  -- XL Black
-(2, 2, 2, 599000, 20),  -- M Blue
-(2, 3, 2, 599000, 20),  -- L Blue
+(2, 2, 3, 'NIKE001-BLACK-M', 599000, 40),  -- M Black
+(2, 3, 3, 'NIKE001-BLACK-L', 599000, 40),  -- L Black
+(2, 4, 3, 'NIKE001-BLACK-XL', 599000, 40),  -- XL Black
+(2, 2, 2, 'NIKE001-BLUE-M', 599000, 20),  -- M Blue
+(2, 3, 2, 'NIKE001-BLUE-L', 599000, 20),  -- L Blue
 
 -- Áo sơ mi Zara Classic
-(3, 2, 4, 399000, 35),  -- M White
-(3, 3, 4, 399000, 35),  -- L White
-(3, 4, 4, 399000, 35),  -- XL White
-(3, 2, 2, 399000, 25),  -- M Blue
-(3, 3, 2, 399000, 25),  -- L Blue
+(3, 2, 4, 'ZARA001-WHITE-M', 399000, 35),  -- M White
+(3, 3, 4, 'ZARA001-WHITE-L', 399000, 35),  -- L White
+(3, 4, 4, 'ZARA001-WHITE-XL', 399000, 35),  -- XL White
+(3, 2, 2, 'ZARA001-BLUE-M', 399000, 25),  -- M Blue
+(3, 3, 2, 'ZARA001-BLUE-L', 399000, 25),  -- L Blue
 
 -- Quần short Adidas
-(4, 1, 3, 299000, 60),  -- S Black
-(4, 2, 3, 299000, 60),  -- M Black
-(4, 3, 3, 299000, 60),  -- L Black
-(4, 1, 2, 299000, 40),  -- S Blue
-(4, 2, 2, 299000, 40),  -- M Blue
-(4, 3, 2, 299000, 40);  -- L Blue
+(4, 1, 3, 'ADIDAS001-BLACK-S', 299000, 60),  -- S Black
+(4, 2, 3, 'ADIDAS001-BLACK-M', 299000, 60),  -- M Black
+(4, 3, 3, 'ADIDAS001-BLACK-L', 299000, 60),  -- L Black
+(4, 1, 2, 'ADIDAS001-BLUE-S', 299000, 40),  -- S Blue
+(4, 2, 2, 'ADIDAS001-BLUE-M', 299000, 40),  -- M Blue
+(4, 3, 2, 'ADIDAS001-BLUE-L', 299000, 40);  -- L Blue
 
 -- Thêm Carts cho users
 INSERT INTO Carts (user_id) VALUES 
@@ -461,12 +463,12 @@ SELECT
     p.product_id,
     p.product_name,
     p.description,
-    p.sku,
-    p.price as base_price,
+    p.sku as product_sku,
     p.status as product_status,
     c.category_name,
     b.brand_name,
     pv.variant_id,
+    pv.sku as variant_sku,
     s.size_name,
     cl.color_name,
     pv.price as variant_price,
@@ -906,7 +908,219 @@ SELECT 'Orders', COUNT(*) FROM Orders
 UNION ALL
 SELECT 'OrderItems', COUNT(*) FROM OrderItems;
 
+-- =============================================
+-- Thêm Views và Stored Procedures mới
+-- =============================================
+
+-- View hiển thị khoảng giá sản phẩm
+CREATE VIEW v_ProductPrices AS
+SELECT 
+    p.product_id,
+    p.product_name,
+    p.description,
+    p.sku as product_sku,
+    p.status as product_status,
+    c.category_name,
+    b.brand_name,
+    MIN(pv.price) as min_price,
+    MAX(pv.price) as max_price,
+    COUNT(pv.variant_id) as variant_count,
+    CASE 
+        WHEN MIN(pv.price) = MAX(pv.price) THEN 
+            FORMAT(MIN(pv.price), 'N0') + ' VNĐ'
+        ELSE 
+            FORMAT(MIN(pv.price), 'N0') + ' – ' + FORMAT(MAX(pv.price), 'N0') + ' VNĐ'
+    END as price_range,
+    p.created_at,
+    p.updated_at
+FROM Products p
+INNER JOIN Categories c ON p.category_id = c.category_id
+INNER JOIN Brands b ON p.brand_id = b.brand_id
+INNER JOIN ProductVariants pv ON p.product_id = pv.product_id
+WHERE pv.status = 'ACTIVE'
+GROUP BY 
+    p.product_id, 
+    p.product_name, 
+    p.description, 
+    p.sku, 
+    p.status, 
+    c.category_name, 
+    b.brand_name, 
+    p.created_at, 
+    p.updated_at;
+GO
+
+-- View hiển thị chi tiết giá theo biến thể
+CREATE VIEW v_ProductVariantPrices AS
+SELECT 
+    p.product_id,
+    p.product_name,
+    p.sku as product_sku,
+    pv.variant_id,
+    pv.sku as variant_sku,
+    s.size_name,
+    c.color_name,
+    pv.price,
+    pv.stock,
+    pv.status as variant_status,
+    FORMAT(pv.price, 'N0') + ' VNĐ' as formatted_price,
+    CASE 
+        WHEN pv.stock = 0 THEN 'Hết hàng'
+        WHEN pv.stock <= 5 THEN 'Sắp hết hàng'
+        ELSE 'Còn hàng'
+    END as stock_status
+FROM Products p
+INNER JOIN ProductVariants pv ON p.product_id = pv.product_id
+INNER JOIN Sizes s ON pv.size_id = s.size_id
+INNER JOIN Colors c ON pv.color_id = c.color_id
+ORDER BY p.product_name, c.color_name, s.size_name;
+GO
+
+-- View để lấy ảnh cho biến thể
+CREATE VIEW vw_VariantImages AS
+WITH VariantImagePriority AS (
+    -- Ưu tiên ảnh riêng của biến thể
+    SELECT 
+        pv.variant_id,
+        pv.product_id,
+        pi.image_id,
+        pi.image_url,
+        pi.image_name,
+        pi.is_primary,
+        pi.sort_order,
+        1 as priority
+    FROM ProductVariants pv
+    INNER JOIN ProductImages pi ON pv.variant_id = pi.variant_id
+    WHERE pi.variant_id IS NOT NULL
+    
+    UNION ALL
+    
+    -- Fallback về ảnh chung của sản phẩm nếu không có ảnh riêng
+    SELECT 
+        pv.variant_id,
+        pv.product_id,
+        pi.image_id,
+        pi.image_url,
+        pi.image_name,
+        pi.is_primary,
+        pi.sort_order,
+        2 as priority
+    FROM ProductVariants pv
+    INNER JOIN ProductImages pi ON pv.product_id = pi.product_id
+    WHERE pi.variant_id IS NULL
+      AND NOT EXISTS (
+          SELECT 1 FROM ProductImages pi2 
+          WHERE pi2.variant_id = pv.variant_id
+      )
+)
+SELECT 
+    vip.variant_id,
+    vip.product_id,
+    vip.image_id,
+    vip.image_url,
+    vip.image_name,
+    vip.is_primary,
+    vip.sort_order,
+    vip.priority,
+    ROW_NUMBER() OVER (
+        PARTITION BY vip.variant_id 
+        ORDER BY vip.priority ASC, vip.is_primary DESC, vip.sort_order ASC
+    ) as image_rank
+FROM VariantImagePriority vip;
+GO
+
+-- Stored Procedure để lấy ảnh chính cho biến thể
+CREATE PROCEDURE sp_GetVariantImage
+    @VariantID INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    -- Lấy ảnh chính cho biến thể (ưu tiên ảnh riêng, fallback về ảnh chung)
+    SELECT TOP 1
+        vi.image_id,
+        vi.image_url,
+        vi.image_name,
+        vi.is_primary,
+        vi.sort_order,
+        p.product_name,
+        c.color_name,
+        s.size_name,
+        pv.sku
+    FROM vw_VariantImages vi
+    INNER JOIN ProductVariants pv ON vi.variant_id = pv.variant_id
+    INNER JOIN Products p ON pv.product_id = p.product_id
+    INNER JOIN Colors c ON pv.color_id = c.color_id
+    INNER JOIN Sizes s ON pv.size_id = s.size_id
+    WHERE vi.variant_id = @VariantID
+      AND vi.image_rank = 1;
+END
+GO
+
+-- Stored Procedure để lấy tất cả ảnh cho biến thể
+CREATE PROCEDURE sp_GetAllVariantImages
+    @VariantID INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    -- Lấy tất cả ảnh cho biến thể (ưu tiên ảnh riêng, sau đó ảnh chung)
+    SELECT 
+        vi.image_id,
+        vi.image_url,
+        vi.image_name,
+        vi.is_primary,
+        vi.sort_order,
+        vi.priority,
+        vi.image_rank,
+        p.product_name,
+        c.color_name,
+        s.size_name,
+        pv.sku,
+        CASE 
+            WHEN vi.priority = 1 THEN 'Variant Specific'
+            ELSE 'Product General'
+        END as image_type
+    FROM vw_VariantImages vi
+    INNER JOIN ProductVariants pv ON vi.variant_id = pv.variant_id
+    INNER JOIN Products p ON pv.product_id = p.product_id
+    INNER JOIN Colors c ON pv.color_id = c.color_id
+    INNER JOIN Sizes s ON pv.size_id = s.size_id
+    WHERE vi.variant_id = @VariantID
+    ORDER BY vi.priority ASC, vi.is_primary DESC, vi.sort_order ASC;
+END
+GO
+
+-- Stored Procedure để lấy thông tin giá sản phẩm
+CREATE PROCEDURE sp_GetProductPriceInfo
+    @ProductID INT = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    IF @ProductID IS NULL
+    BEGIN
+        -- Lấy tất cả sản phẩm
+        SELECT * FROM v_ProductPrices
+        ORDER BY product_name;
+    END
+    ELSE
+    BEGIN
+        -- Lấy sản phẩm cụ thể
+        SELECT * FROM v_ProductPrices
+        WHERE product_id = @ProductID;
+        
+        -- Lấy chi tiết giá theo biến thể
+        SELECT * FROM v_ProductVariantPrices
+        WHERE product_id = @ProductID
+        ORDER BY color_name, size_name;
+    END
+END
+GO
+
 PRINT 'Database ClothingStoreDB đã được tạo thành công!';
-PRINT 'Tổng cộng: 17 bảng, 15 views, 10 triggers, 4 stored procedures';
+PRINT 'Tổng cộng: 17 bảng, 18 views, 10 triggers, 7 stored procedures';
 PRINT 'Dữ liệu mẫu đã được thêm vào tất cả các bảng';
 PRINT 'Hỗ trợ multiple images cho sản phẩm (tối đa 10 ảnh/sản phẩm)';
+PRINT 'Hỗ trợ ảnh riêng cho từng biến thể sản phẩm';
+PRINT 'Quản lý giá theo biến thể thay vì sản phẩm chung';

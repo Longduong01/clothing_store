@@ -317,6 +317,16 @@ export const variantApi = {
     return response.data;
   },
 
+  // Create new variant with file upload
+  createVariantWithFile: async (formData: FormData): Promise<ProductVariant> => {
+    const response = await api.post('/variants', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
+
   // Update variant
   updateVariant: async (id: number, data: UpdateVariantRequest): Promise<ProductVariant> => {
     const response = await api.put(`/variants/${id}`, data);
@@ -338,6 +348,12 @@ export const variantApi = {
     } catch (error) {
       return null;
     }
+  },
+
+  // Update all product statuses based on variants
+  updateAllProductStatuses: async (): Promise<string> => {
+    const response = await api.post('/variants/update-product-statuses');
+    return response.data;
   },
 };
 

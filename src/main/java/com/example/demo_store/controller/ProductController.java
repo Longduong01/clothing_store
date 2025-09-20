@@ -4,6 +4,7 @@ import com.example.demo_store.entity.Product;
 import com.example.demo_store.entity.Category;
 import com.example.demo_store.entity.Brand;
 import com.example.demo_store.entity.ProductImage;
+import com.example.demo_store.dto.ProductUpdateRequest;
 import com.example.demo_store.repository.ProductRepository;
 import com.example.demo_store.repository.CategoryRepository;
 import com.example.demo_store.repository.BrandRepository;
@@ -191,16 +192,33 @@ public class ProductController {
     
     // PUT /api/products/{id} - Cập nhật product
     @PutMapping("/{id}")
-    public ResponseEntity<ProductDto> updateProduct(@PathVariable Long id, @RequestBody Product productDetails) {
+    public ResponseEntity<ProductDto> updateProduct(@PathVariable Long id, @RequestBody ProductUpdateRequest request) {
         try {
             Optional<Product> productOptional = productRepository.findById(id);
             if (productOptional.isPresent()) {
                 Product product = productOptional.get();
-                product.setProductName(productDetails.getProductName());
-                product.setDescription(productDetails.getDescription());
-                product.setSku(productDetails.getSku());
-                // Price and stock are now managed at variant level
-                product.setStatus(productDetails.getStatus());
+                product.setProductName(request.getProductName());
+                product.setDescription(request.getDescription());
+                product.setSku(request.getSku());
+                product.setStatus(Product.ProductStatus.valueOf(request.getStatus()));
+                product.setImageUrl(request.getImageUrl());
+                product.setThumbnailUrl(request.getThumbnailUrl());
+                
+                // Update category if provided
+                if (request.getCategoryId() != null) {
+                    Optional<Category> category = categoryRepository.findById(request.getCategoryId());
+                    if (category.isPresent()) {
+                        product.setCategory(category.get());
+                    }
+                }
+                
+                // Update brand if provided
+                if (request.getBrandId() != null) {
+                    Optional<Brand> brand = brandRepository.findById(request.getBrandId());
+                    if (brand.isPresent()) {
+                        product.setBrand(brand.get());
+                    }
+                }
                 
                 Product updatedProduct = productRepository.save(product);
                 return ResponseEntity.ok(ProductDto.fromEntity(updatedProduct));
@@ -494,3 +512,4 @@ class SimpleRef {
     public String name;
     public SimpleRef(Long id, String name) { this.id = id; this.name = name; }
 }
+

@@ -83,6 +83,7 @@ export interface ProductVariant extends BaseEntity {
   price: number;
   stock: number;
   status: VariantStatus;
+  imagePath?: string;
   product: SimpleRef;
   size: SimpleRef;
   color: SimpleRef;
@@ -111,6 +112,8 @@ export interface CreateVariantRequest {
 
 export interface UpdateVariantRequest {
   sku: string;
+  sizeId: number;
+  colorId: number;
   price: number;
   stock: number;
   status: VariantStatus;

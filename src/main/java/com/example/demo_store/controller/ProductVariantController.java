@@ -8,15 +8,24 @@ import com.example.demo_store.repository.ProductRepository;
 import com.example.demo_store.repository.SizeRepository;
 import com.example.demo_store.repository.ColorRepository;
 import com.example.demo_store.dto.ProductVariantDTO;
+import com.example.demo_store.service.ProductStatusService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 
+import java.io.IOException;
 import java.math.BigDecimal;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
+import java.text.Normalizer;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/variants")
@@ -33,6 +42,12 @@ public class ProductVariantController {
     
     @Autowired
     private ColorRepository colorRepository;
+    
+    @Autowired
+    private ProductStatusService productStatusService;
+    
+    // Upload directory
+    private static final String UPLOAD_DIR = "uploads/variants/";
     
     // GET /api/variants/product/{productId} - Lấy danh sách biến thể của sản phẩm
     @GetMapping("/product/{productId}")
@@ -60,33 +75,57 @@ public class ProductVariantController {
         }
     }
     
-    // POST /api/variants - Tạo biến thể mới
-    @PostMapping
-    public ResponseEntity<ProductVariantDTO> createVariant(@Valid @RequestBody ProductVariantCreateRequest request) {
+    // POST /api/variants - Tạo biến thể mới (multipart/form-data)
+    @PostMapping(consumes = "multipart/form-data")
+    public ResponseEntity<ProductVariantDTO> createVariant(
+            @RequestParam("productId") Long productId,
+            @RequestParam("sizeId") Long sizeId,
+            @RequestParam("colorId") Long colorId,
+            @RequestParam(value = "sku", required = false) String sku,
+            @RequestParam("price") BigDecimal price,
+            @RequestParam("stock") Integer stock,
+            @RequestParam(value = "status", defaultValue = "ACTIVE") String status,
+            @RequestParam(value = "image", required = false) MultipartFile image) {
         try {
             // Kiểm tra product tồn tại
-            Optional<Product> product = productRepository.findById(request.getProductId());
+            Optional<Product> product = productRepository.findById(productId);
             if (!product.isPresent()) {
                 return ResponseEntity.badRequest().build();
             }
             
             // Kiểm tra size tồn tại
-            Optional<com.example.demo_store.entity.Size> size = sizeRepository.findById(request.getSizeId());
+            Optional<com.example.demo_store.entity.Size> size = sizeRepository.findById(sizeId);
             if (!size.isPresent()) {
                 return ResponseEntity.badRequest().build();
             }
             
             // Kiểm tra color tồn tại
-            Optional<Color> color = colorRepository.findById(request.getColorId());
+            Optional<Color> color = colorRepository.findById(colorId);
             if (!color.isPresent()) {
                 return ResponseEntity.badRequest().build();
             }
             
             // Kiểm tra biến thể đã tồn tại chưa
             List<ProductVariant> existingVariants = variantRepository.findByProductAndSizeAndColor(
-                request.getProductId(), request.getSizeId(), request.getColorId());
+                productId, sizeId, colorId);
             if (!existingVariants.isEmpty()) {
                 return ResponseEntity.badRequest().build();
+            }
+            
+            // Auto-generate SKU nếu không có
+            if (sku == null || sku.trim().isEmpty()) {
+                sku = generateSku(product.get().getSku(), color.get().getColorName(), size.get().getSizeName());
+            }
+            
+            // Kiểm tra SKU unique
+            if (variantRepository.findBySku(sku).isPresent()) {
+                return ResponseEntity.badRequest().build();
+            }
+            
+            // Xử lý upload ảnh
+            String imagePath = null;
+            if (image != null && !image.isEmpty()) {
+                imagePath = saveImage(image);
             }
             
             // Tạo biến thể mới
@@ -94,12 +133,17 @@ public class ProductVariantController {
             variant.setProduct(product.get());
             variant.setSize(size.get());
             variant.setColor(color.get());
-            variant.setSku(request.getSku());
-            variant.setPrice(request.getPrice());
-            variant.setStock(request.getStock());
-            variant.setStatus(ProductVariant.VariantStatus.valueOf(request.getStatus()));
+            variant.setSku(sku);
+            variant.setPrice(price);
+            variant.setStock(stock);
+            variant.setStatus(ProductVariant.VariantStatus.valueOf(status));
+            variant.setImagePath(imagePath);
             
             ProductVariant savedVariant = variantRepository.save(variant);
+            
+            // Tự động cập nhật trạng thái sản phẩm
+            productStatusService.updateProductStatusBasedOnVariants(productId);
+            
             return ResponseEntity.ok(ProductVariantDTO.fromEntity(savedVariant));
         } catch (Exception e) {
             e.printStackTrace();
@@ -118,13 +162,41 @@ public class ProductVariantController {
             
             ProductVariant variant = variantOptional.get();
             
+            // Kiểm tra size tồn tại
+            Optional<com.example.demo_store.entity.Size> size = sizeRepository.findById(request.getSizeId());
+            if (!size.isPresent()) {
+                return ResponseEntity.badRequest().build();
+            }
+            
+            // Kiểm tra color tồn tại
+            Optional<Color> color = colorRepository.findById(request.getColorId());
+            if (!color.isPresent()) {
+                return ResponseEntity.badRequest().build();
+            }
+            
+            // Kiểm tra biến thể đã tồn tại chưa (nếu thay đổi size/color)
+            if (!variant.getSize().getSizeId().equals(request.getSizeId()) || 
+                !variant.getColor().getColorId().equals(request.getColorId())) {
+                List<ProductVariant> existingVariants = variantRepository.findByProductAndSizeAndColor(
+                    variant.getProduct().getProductId(), request.getSizeId(), request.getColorId());
+                if (!existingVariants.isEmpty() && !existingVariants.get(0).getVariantId().equals(id)) {
+                    return ResponseEntity.badRequest().build();
+                }
+            }
+            
             // Cập nhật thông tin
             variant.setSku(request.getSku());
+            variant.setSize(size.get());
+            variant.setColor(color.get());
             variant.setPrice(request.getPrice());
             variant.setStock(request.getStock());
             variant.setStatus(ProductVariant.VariantStatus.valueOf(request.getStatus()));
             
             ProductVariant updatedVariant = variantRepository.save(variant);
+            
+            // Tự động cập nhật trạng thái sản phẩm
+            productStatusService.updateProductStatusBasedOnVariants(variant.getProduct().getProductId());
+            
             return ResponseEntity.ok(ProductVariantDTO.fromEntity(updatedVariant));
         } catch (Exception e) {
             e.printStackTrace();
@@ -136,8 +208,16 @@ public class ProductVariantController {
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteVariant(@PathVariable Long id) {
         try {
-            if (variantRepository.existsById(id)) {
+            Optional<ProductVariant> variantOptional = variantRepository.findById(id);
+            if (variantOptional.isPresent()) {
+                ProductVariant variant = variantOptional.get();
+                Long productId = variant.getProduct().getProductId();
+                
                 variantRepository.deleteById(id);
+                
+                // Tự động cập nhật trạng thái sản phẩm
+                productStatusService.updateProductStatusBasedOnVariants(productId);
+                
                 return ResponseEntity.ok().build();
             } else {
                 return ResponseEntity.notFound().build();
@@ -159,6 +239,55 @@ public class ProductVariantController {
             e.printStackTrace();
             return ResponseEntity.status(500).build();
         }
+    }
+    
+    // POST /api/variants/update-product-statuses - Cập nhật trạng thái tất cả sản phẩm
+    @PostMapping("/update-product-statuses")
+    public ResponseEntity<String> updateAllProductStatuses() {
+        try {
+            productStatusService.updateAllProductStatuses();
+            return ResponseEntity.ok("Đã cập nhật trạng thái tất cả sản phẩm thành công");
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).body("Lỗi khi cập nhật trạng thái sản phẩm");
+        }
+    }
+    
+    // Helper methods
+    private String generateSku(String productCode, String colorName, String sizeName) {
+        // Normalize color name (remove accents, convert to uppercase)
+        String normalizedColor = normalizeString(colorName).toUpperCase();
+        String normalizedSize = sizeName.toUpperCase();
+        return productCode + "-" + normalizedColor + "-" + normalizedSize;
+    }
+    
+    private String normalizeString(String input) {
+        if (input == null) return "";
+        // Remove accents and special characters
+        String normalized = Normalizer.normalize(input, Normalizer.Form.NFD);
+        return normalized.replaceAll("[^\\p{ASCII}]", "")
+                        .replaceAll("[^a-zA-Z0-9]", "")
+                        .toUpperCase();
+    }
+    
+    private String saveImage(MultipartFile image) throws IOException {
+        // Create upload directory if not exists
+        Path uploadPath = Paths.get(UPLOAD_DIR);
+        if (!Files.exists(uploadPath)) {
+            Files.createDirectories(uploadPath);
+        }
+        
+        // Generate unique filename
+        String originalFilename = image.getOriginalFilename();
+        String extension = originalFilename != null ? 
+            originalFilename.substring(originalFilename.lastIndexOf(".")) : ".jpg";
+        String filename = UUID.randomUUID().toString() + extension;
+        
+        // Save file
+        Path filePath = uploadPath.resolve(filename);
+        Files.copy(image.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
+        
+        return UPLOAD_DIR + filename;
     }
     
     // Request/Response classes
@@ -213,6 +342,12 @@ public class ProductVariantController {
         @jakarta.validation.constraints.Size(max = 100, message = "SKU must not exceed 100 characters")
         private String sku;
         
+        @NotNull(message = "Size ID is required")
+        private Long sizeId;
+        
+        @NotNull(message = "Color ID is required")
+        private Long colorId;
+        
         @NotNull(message = "Price is required")
         private BigDecimal price;
         
@@ -225,6 +360,12 @@ public class ProductVariantController {
         // Getters and setters
         public String getSku() { return sku; }
         public void setSku(String sku) { this.sku = sku; }
+        
+        public Long getSizeId() { return sizeId; }
+        public void setSizeId(Long sizeId) { this.sizeId = sizeId; }
+        
+        public Long getColorId() { return colorId; }
+        public void setColorId(Long colorId) { this.colorId = colorId; }
         
         public BigDecimal getPrice() { return price; }
         public void setPrice(BigDecimal price) { this.price = price; }
