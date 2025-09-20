@@ -34,7 +34,7 @@ public class ProductDTO {
         dto.setProductName(product.getProductName());
         dto.setDescription(product.getDescription());
         dto.setSku(product.getSku());
-        dto.setPrice(product.getPrice());
+        dto.setPrice(null); // Price is now managed at variant level
         dto.setStatus(product.getStatus().toString());
         dto.setCategoryName(product.getCategory() != null ? product.getCategory().getCategoryName() : null);
         dto.setBrandName(product.getBrand() != null ? product.getBrand().getBrandName() : null);

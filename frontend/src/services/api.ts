@@ -13,6 +13,9 @@ import {
   UpdateColorRequest,
   Brand,
   Category,
+  ProductVariant,
+  CreateVariantRequest,
+  UpdateVariantRequest,
   FilterOptions
 } from '../types';
 
@@ -291,6 +294,50 @@ export const productApi = {
   },
   deleteProduct: async (id: number): Promise<void> => {
     await api.delete(`/products/${id}`);
+  },
+};
+
+// Product Variant API
+export const variantApi = {
+  // Get variants by product ID
+  getVariantsByProduct: async (productId: number): Promise<ProductVariant[]> => {
+    const response = await api.get(`/variants/product/${productId}`);
+    return response.data;
+  },
+
+  // Get variant by ID
+  getVariantById: async (id: number): Promise<ProductVariant> => {
+    const response = await api.get(`/variants/${id}`);
+    return response.data;
+  },
+
+  // Create new variant
+  createVariant: async (data: CreateVariantRequest): Promise<ProductVariant> => {
+    const response = await api.post('/variants', data);
+    return response.data;
+  },
+
+  // Update variant
+  updateVariant: async (id: number, data: UpdateVariantRequest): Promise<ProductVariant> => {
+    const response = await api.put(`/variants/${id}`, data);
+    return response.data;
+  },
+
+  // Delete variant
+  deleteVariant: async (id: number): Promise<void> => {
+    await api.delete(`/variants/${id}`);
+  },
+
+  // Get variant by SKU (for validation)
+  getVariantBySku: async (sku: string): Promise<ProductVariant | null> => {
+    try {
+      const response = await api.get(`/variants/sku/${encodeURIComponent(sku)}`, {
+        validateStatus: (status) => status === 200 || status === 404
+      });
+      return response.status === 200 ? response.data : null;
+    } catch (error) {
+      return null;
+    }
   },
 };
 

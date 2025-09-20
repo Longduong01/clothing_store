@@ -9,7 +9,6 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -39,10 +38,9 @@ public class Product {
     @Column(name = "sku", unique = true, nullable = false, length = 50)
     private String sku;
     
-    @NotNull(message = "Price is required")
-    @DecimalMin(value = "0.0", inclusive = false, message = "Price must be greater than 0")
-    @Column(name = "price", nullable = false)
-    private BigDecimal price;
+    // Price and stock are now managed at variant level
+    // @Column(name = "price", nullable = false)
+    // private BigDecimal price;
     
     @Column(name = "image_url", length = 500)
     private String imageUrl;
@@ -53,10 +51,9 @@ public class Product {
     @Column(name = "gallery_images", columnDefinition = "TEXT")
     private String galleryImages;
     
-    @NotNull(message = "Stock quantity is required")
-    @Min(value = 0, message = "Stock quantity must be non-negative")
-    @Column(name = "stock_quantity", nullable = false)
-    private Integer stockQuantity = 0;
+    // Stock quantity is now managed at variant level
+    // @Column(name = "stock_quantity", nullable = false)
+    // private Integer stockQuantity = 0;
     
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)

@@ -67,13 +67,53 @@ export interface Product extends BaseEntity {
   productName: string;
   description?: string;
   sku: string;
-  price: number;
+  price?: number; // Optional for parent products
   imageUrl?: string;
   thumbnailUrl?: string;
-  stockQuantity: number;
+  stockQuantity?: number; // Optional for parent products
   status: ProductStatus;
   category: Category;
   brand: Brand;
+}
+
+// Product Variant types
+export interface ProductVariant extends BaseEntity {
+  variantId: number;
+  sku: string;
+  price: number;
+  stock: number;
+  status: VariantStatus;
+  product: SimpleRef;
+  size: SimpleRef;
+  color: SimpleRef;
+}
+
+export enum VariantStatus {
+  ACTIVE = 'ACTIVE',
+  INACTIVE = 'INACTIVE',
+  OUT_OF_STOCK = 'OUT_OF_STOCK'
+}
+
+export interface SimpleRef {
+  id: number;
+  name: string;
+}
+
+export interface CreateVariantRequest {
+  productId: number;
+  sizeId: number;
+  colorId: number;
+  sku: string;
+  price: number;
+  stock: number;
+  status: VariantStatus;
+}
+
+export interface UpdateVariantRequest {
+  sku: string;
+  price: number;
+  stock: number;
+  status: VariantStatus;
 }
 
 export enum ProductStatus {

@@ -2,240 +2,189 @@ package com.example.demo_store.controller;
 
 import com.example.demo_store.entity.ProductVariant;
 import com.example.demo_store.entity.Product;
-import com.example.demo_store.entity.Size;
 import com.example.demo_store.entity.Color;
 import com.example.demo_store.repository.ProductVariantRepository;
 import com.example.demo_store.repository.ProductRepository;
 import com.example.demo_store.repository.SizeRepository;
 import com.example.demo_store.repository.ColorRepository;
+import com.example.demo_store.dto.ProductVariantDTO;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.*;
 
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 
 @RestController
-@RequestMapping("/api/product-variants")
-@CrossOrigin(origins = "*")
+@RequestMapping("/api/variants")
 public class ProductVariantController {
-
+    
     @Autowired
-    private ProductVariantRepository productVariantRepository;
-
+    private ProductVariantRepository variantRepository;
+    
     @Autowired
     private ProductRepository productRepository;
-
+    
     @Autowired
     private SizeRepository sizeRepository;
-
+    
     @Autowired
     private ColorRepository colorRepository;
-
-    // GET /api/product-variants - Lấy tất cả biến thể sản phẩm với pagination
-    @GetMapping
-    public ResponseEntity<?> getAllProductVariants(
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size,
-            @RequestParam(defaultValue = "createdAt") String sortBy,
-            @RequestParam(defaultValue = "desc") String sortDir,
-            @RequestParam(required = false) Long productId,
-            @RequestParam(required = false) String status
-    ) {
-        try {
-            Sort sort = sortDir.equalsIgnoreCase("desc") ? 
-                Sort.by(sortBy).descending() : Sort.by(sortBy).ascending();
-            Pageable pageable = PageRequest.of(page, size, sort);
-            
-            Page<ProductVariant> variants;
-            if (productId != null && status != null) {
-                variants = productVariantRepository.findByProductProductIdAndStatus(productId, 
-                    ProductVariant.VariantStatus.valueOf(status), pageable);
-            } else if (productId != null) {
-                variants = productVariantRepository.findByProductProductId(productId, pageable);
-            } else if (status != null) {
-                variants = productVariantRepository.findByStatus(
-                    ProductVariant.VariantStatus.valueOf(status), pageable);
-            } else {
-                variants = productVariantRepository.findAll(pageable);
-            }
-            
-            return ResponseEntity.ok(variants);
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(new ErrorResponse("Failed to fetch product variants: " + e.getMessage()));
-        }
-    }
-
-    // GET /api/product-variants/{id} - Lấy biến thể sản phẩm theo ID
-    @GetMapping("/{id}")
-    public ResponseEntity<?> getProductVariantById(@PathVariable Long id) {
-        try {
-            Optional<ProductVariant> variant = productVariantRepository.findById(id);
-            if (variant.isPresent()) {
-                return ResponseEntity.ok(variant.get());
-            } else {
-                return ResponseEntity.notFound().build();
-            }
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(new ErrorResponse("Failed to fetch product variant: " + e.getMessage()));
-        }
-    }
-
-    // GET /api/product-variants/product/{productId} - Lấy biến thể theo sản phẩm
+    
+    // GET /api/variants/product/{productId} - Lấy danh sách biến thể của sản phẩm
     @GetMapping("/product/{productId}")
-    public ResponseEntity<?> getProductVariantsByProduct(@PathVariable Long productId) {
+    public ResponseEntity<List<ProductVariantDTO>> getVariantsByProduct(@PathVariable Long productId) {
         try {
-            List<ProductVariant> variants = productVariantRepository.findByProductProductIdOrderByCreatedAtAsc(productId);
-            return ResponseEntity.ok(variants);
+            List<ProductVariant> variants = variantRepository.findByProductProductId(productId);
+            List<ProductVariantDTO> dtos = variants.stream().map(ProductVariantDTO::fromEntity).toList();
+            return ResponseEntity.ok(dtos);
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(new ErrorResponse("Failed to fetch product variants: " + e.getMessage()));
+            e.printStackTrace();
+            return ResponseEntity.status(500).build();
         }
     }
-
-    // POST /api/product-variants - Tạo biến thể sản phẩm mới
-    @PostMapping
-    public ResponseEntity<?> createProductVariant(@RequestBody ProductVariantCreateRequest request) {
+    
+    // GET /api/variants/{id} - Lấy biến thể theo ID
+    @GetMapping("/{id}")
+    public ResponseEntity<ProductVariantDTO> getVariantById(@PathVariable Long id) {
         try {
-            // Validate product exists
-            if (!productRepository.existsById(request.getProductId())) {
-                return ResponseEntity.badRequest().body(new ErrorResponse("Product not found"));
+            Optional<ProductVariant> variant = variantRepository.findById(id);
+            return variant.map(v -> ResponseEntity.ok(ProductVariantDTO.fromEntity(v)))
+                        .orElse(ResponseEntity.notFound().build());
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).build();
+        }
+    }
+    
+    // POST /api/variants - Tạo biến thể mới
+    @PostMapping
+    public ResponseEntity<ProductVariantDTO> createVariant(@Valid @RequestBody ProductVariantCreateRequest request) {
+        try {
+            // Kiểm tra product tồn tại
+            Optional<Product> product = productRepository.findById(request.getProductId());
+            if (!product.isPresent()) {
+                return ResponseEntity.badRequest().build();
             }
-
-            // Validate size exists
-            if (!sizeRepository.existsById(request.getSizeId())) {
-                return ResponseEntity.badRequest().body(new ErrorResponse("Size not found"));
+            
+            // Kiểm tra size tồn tại
+            Optional<com.example.demo_store.entity.Size> size = sizeRepository.findById(request.getSizeId());
+            if (!size.isPresent()) {
+                return ResponseEntity.badRequest().build();
             }
-
-            // Validate color exists
-            if (!colorRepository.existsById(request.getColorId())) {
-                return ResponseEntity.badRequest().body(new ErrorResponse("Color not found"));
+            
+            // Kiểm tra color tồn tại
+            Optional<Color> color = colorRepository.findById(request.getColorId());
+            if (!color.isPresent()) {
+                return ResponseEntity.badRequest().build();
             }
-
-            // Check if variant already exists
-            if (productVariantRepository.existsByProductProductIdAndSizeSizeIdAndColorColorId(
-                request.getProductId(), request.getSizeId(), request.getColorId())) {
-                return ResponseEntity.badRequest().body(new ErrorResponse("Product variant already exists"));
+            
+            // Kiểm tra biến thể đã tồn tại chưa
+            List<ProductVariant> existingVariants = variantRepository.findByProductAndSizeAndColor(
+                request.getProductId(), request.getSizeId(), request.getColorId());
+            if (!existingVariants.isEmpty()) {
+                return ResponseEntity.badRequest().build();
             }
-
-            Product product = productRepository.findById(request.getProductId()).get();
-            Size size = sizeRepository.findById(request.getSizeId()).get();
-            Color color = colorRepository.findById(request.getColorId()).get();
-
-            // Create product variant
+            
+            // Tạo biến thể mới
             ProductVariant variant = new ProductVariant();
-            variant.setProduct(product);
-            variant.setSize(size);
-            variant.setColor(color);
+            variant.setProduct(product.get());
+            variant.setSize(size.get());
+            variant.setColor(color.get());
+            variant.setSku(request.getSku());
             variant.setPrice(request.getPrice());
             variant.setStock(request.getStock());
-            variant.setStatus(request.getStatus());
-
-            ProductVariant savedVariant = productVariantRepository.save(variant);
-            return ResponseEntity.ok(savedVariant);
+            variant.setStatus(ProductVariant.VariantStatus.valueOf(request.getStatus()));
+            
+            ProductVariant savedVariant = variantRepository.save(variant);
+            return ResponseEntity.ok(ProductVariantDTO.fromEntity(savedVariant));
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(new ErrorResponse("Failed to create product variant: " + e.getMessage()));
+            e.printStackTrace();
+            return ResponseEntity.status(500).build();
         }
     }
-
-    // PUT /api/product-variants/{id} - Cập nhật biến thể sản phẩm
+    
+    // PUT /api/variants/{id} - Cập nhật biến thể
     @PutMapping("/{id}")
-    public ResponseEntity<?> updateProductVariant(@PathVariable Long id, @RequestBody ProductVariantUpdateRequest request) {
+    public ResponseEntity<ProductVariantDTO> updateVariant(@PathVariable Long id, @Valid @RequestBody ProductVariantUpdateRequest request) {
         try {
-            Optional<ProductVariant> variantOptional = productVariantRepository.findById(id);
-            if (variantOptional.isEmpty()) {
+            Optional<ProductVariant> variantOptional = variantRepository.findById(id);
+            if (!variantOptional.isPresent()) {
                 return ResponseEntity.notFound().build();
             }
-
+            
             ProductVariant variant = variantOptional.get();
-            if (request.getPrice() != null) {
-                variant.setPrice(request.getPrice());
-            }
-            if (request.getStock() != null) {
-                variant.setStock(request.getStock());
-            }
-            if (request.getStatus() != null) {
-                variant.setStatus(request.getStatus());
-            }
-
-            ProductVariant updatedVariant = productVariantRepository.save(variant);
-            return ResponseEntity.ok(updatedVariant);
+            
+            // Cập nhật thông tin
+            variant.setSku(request.getSku());
+            variant.setPrice(request.getPrice());
+            variant.setStock(request.getStock());
+            variant.setStatus(ProductVariant.VariantStatus.valueOf(request.getStatus()));
+            
+            ProductVariant updatedVariant = variantRepository.save(variant);
+            return ResponseEntity.ok(ProductVariantDTO.fromEntity(updatedVariant));
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(new ErrorResponse("Failed to update product variant: " + e.getMessage()));
+            e.printStackTrace();
+            return ResponseEntity.status(500).build();
         }
     }
-
-    // DELETE /api/product-variants/{id} - Xóa biến thể sản phẩm
+    
+    // DELETE /api/variants/{id} - Xóa biến thể
     @DeleteMapping("/{id}")
-    public ResponseEntity<?> deleteProductVariant(@PathVariable Long id) {
+    public ResponseEntity<Void> deleteVariant(@PathVariable Long id) {
         try {
-            if (!productVariantRepository.existsById(id)) {
+            if (variantRepository.existsById(id)) {
+                variantRepository.deleteById(id);
+                return ResponseEntity.ok().build();
+            } else {
                 return ResponseEntity.notFound().build();
             }
-
-            productVariantRepository.deleteById(id);
-            return ResponseEntity.ok(new SuccessResponse("Product variant deleted successfully"));
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(new ErrorResponse("Failed to delete product variant: " + e.getMessage()));
+            e.printStackTrace();
+            return ResponseEntity.status(500).build();
         }
     }
-
-    // GET /api/product-variants/stats - Thống kê biến thể sản phẩm
-    @GetMapping("/stats")
-    public ResponseEntity<?> getProductVariantStats() {
+    
+    // GET /api/variants/sku/{sku} - Lấy biến thể theo SKU (cho validation)
+    @GetMapping("/sku/{sku}")
+    public ResponseEntity<ProductVariantDTO> getVariantBySku(@PathVariable String sku) {
         try {
-            long totalVariants = productVariantRepository.count();
-            long activeVariants = productVariantRepository.countByStatus(ProductVariant.VariantStatus.ACTIVE);
-            long outOfStockVariants = productVariantRepository.countByStatus(ProductVariant.VariantStatus.OUT_OF_STOCK);
-            long inactiveVariants = productVariantRepository.countByStatus(ProductVariant.VariantStatus.INACTIVE);
-
-            ProductVariantStats stats = new ProductVariantStats();
-            stats.setTotalVariants(totalVariants);
-            stats.setActiveVariants(activeVariants);
-            stats.setOutOfStockVariants(outOfStockVariants);
-            stats.setInactiveVariants(inactiveVariants);
-
-            return ResponseEntity.ok(stats);
+            Optional<ProductVariant> variant = variantRepository.findBySku(sku);
+            return variant.map(v -> ResponseEntity.ok(ProductVariantDTO.fromEntity(v)))
+                        .orElse(ResponseEntity.notFound().build());
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(new ErrorResponse("Failed to fetch product variant stats: " + e.getMessage()));
+            e.printStackTrace();
+            return ResponseEntity.status(500).build();
         }
     }
-
-    // Response classes
-    public static class ErrorResponse {
-        private String error;
-        
-        public ErrorResponse(String error) {
-            this.error = error;
-        }
-        
-        public String getError() { return error; }
-        public void setError(String error) { this.error = error; }
-    }
-
-    public static class SuccessResponse {
-        private String message;
-        
-        public SuccessResponse(String message) {
-            this.message = message;
-        }
-        
-        public String getMessage() { return message; }
-        public void setMessage(String message) { this.message = message; }
-    }
-
+    
+    // Request/Response classes
     public static class ProductVariantCreateRequest {
+        @NotNull(message = "Product ID is required")
         private Long productId;
+        
+        @NotNull(message = "Size ID is required")
         private Long sizeId;
+        
+        @NotNull(message = "Color ID is required")
         private Long colorId;
+        
+        @NotBlank(message = "SKU is required")
+        @jakarta.validation.constraints.Size(max = 100, message = "SKU must not exceed 100 characters")
+        private String sku;
+        
+        @NotNull(message = "Price is required")
         private BigDecimal price;
+        
+        @NotNull(message = "Stock is required")
+        @Min(value = 0, message = "Stock must be non-negative")
         private Integer stock;
-        private ProductVariant.VariantStatus status;
-
+        
+        private String status = "ACTIVE";
+        
         // Getters and setters
         public Long getProductId() { return productId; }
         public void setProductId(Long productId) { this.productId = productId; }
@@ -246,49 +195,44 @@ public class ProductVariantController {
         public Long getColorId() { return colorId; }
         public void setColorId(Long colorId) { this.colorId = colorId; }
         
+        public String getSku() { return sku; }
+        public void setSku(String sku) { this.sku = sku; }
+        
         public BigDecimal getPrice() { return price; }
         public void setPrice(BigDecimal price) { this.price = price; }
         
         public Integer getStock() { return stock; }
         public void setStock(Integer stock) { this.stock = stock; }
         
-        public ProductVariant.VariantStatus getStatus() { return status; }
-        public void setStatus(ProductVariant.VariantStatus status) { this.status = status; }
+        public String getStatus() { return status; }
+        public void setStatus(String status) { this.status = status; }
     }
-
+    
     public static class ProductVariantUpdateRequest {
+        @NotBlank(message = "SKU is required")
+        @jakarta.validation.constraints.Size(max = 100, message = "SKU must not exceed 100 characters")
+        private String sku;
+        
+        @NotNull(message = "Price is required")
         private BigDecimal price;
+        
+        @NotNull(message = "Stock is required")
+        @Min(value = 0, message = "Stock must be non-negative")
         private Integer stock;
-        private ProductVariant.VariantStatus status;
-
+        
+        private String status;
+        
         // Getters and setters
+        public String getSku() { return sku; }
+        public void setSku(String sku) { this.sku = sku; }
+        
         public BigDecimal getPrice() { return price; }
         public void setPrice(BigDecimal price) { this.price = price; }
         
         public Integer getStock() { return stock; }
         public void setStock(Integer stock) { this.stock = stock; }
         
-        public ProductVariant.VariantStatus getStatus() { return status; }
-        public void setStatus(ProductVariant.VariantStatus status) { this.status = status; }
-    }
-
-    public static class ProductVariantStats {
-        private long totalVariants;
-        private long activeVariants;
-        private long outOfStockVariants;
-        private long inactiveVariants;
-
-        // Getters and setters
-        public long getTotalVariants() { return totalVariants; }
-        public void setTotalVariants(long totalVariants) { this.totalVariants = totalVariants; }
-        
-        public long getActiveVariants() { return activeVariants; }
-        public void setActiveVariants(long activeVariants) { this.activeVariants = activeVariants; }
-        
-        public long getOutOfStockVariants() { return outOfStockVariants; }
-        public void setOutOfStockVariants(long outOfStockVariants) { this.outOfStockVariants = outOfStockVariants; }
-        
-        public long getInactiveVariants() { return inactiveVariants; }
-        public void setInactiveVariants(long inactiveVariants) { this.inactiveVariants = inactiveVariants; }
+        public String getStatus() { return status; }
+        public void setStatus(String status) { this.status = status; }
     }
 }

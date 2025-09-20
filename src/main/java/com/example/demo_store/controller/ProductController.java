@@ -16,7 +16,6 @@ import org.springframework.web.multipart.MultipartFile;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 
-import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -137,20 +136,11 @@ public class ProductController {
         }
     }
     
-    // GET /api/products/price-range?min={min}&max={max} - Lấy products theo khoảng giá
-    @GetMapping("/price-range")
-    public ResponseEntity<List<Product>> getProductsByPriceRange(
-            @RequestParam Double minPrice, 
-            @RequestParam Double maxPrice) {
-        try {
-            List<Product> products = productRepository.findByPriceRange(minPrice, maxPrice);
-            return ResponseEntity.ok(products);
-        } catch (Exception e) {
-            return ResponseEntity.status(500).build();
-        }
-    }
+    // Price range search is now handled at variant level
+    // @GetMapping("/price-range")
+    // public ResponseEntity<List<Product>> getProductsByPriceRange(...)
     
-    // POST /api/products - Tạo product mới
+    // POST /api/products - Tạo product mới (parent product)
     @PostMapping
     public ResponseEntity<Product> createProduct(@Valid @RequestBody ProductCreateRequest request) {
         try {
@@ -158,10 +148,10 @@ public class ProductController {
             product.setProductName(request.getProductName());
             product.setDescription(request.getDescription());
             product.setSku(request.getSku());
-            product.setPrice(new BigDecimal(request.getPrice()));
-            product.setStockQuantity(request.getStockQuantity());
+            // Price and stock are now managed at variant level
             product.setStatus(Product.ProductStatus.valueOf(request.getStatus()));
             product.setImageUrl(request.getImageUrl());
+            product.setThumbnailUrl(request.getThumbnailUrl());
             
             // Set category
             if (request.getCategoryId() != null) {
@@ -182,6 +172,7 @@ public class ProductController {
             Product savedProduct = productRepository.save(product);
             return ResponseEntity.ok(savedProduct);
         } catch (Exception e) {
+            e.printStackTrace();
             return ResponseEntity.status(500).build();
         }
     }
@@ -208,7 +199,7 @@ public class ProductController {
                 product.setProductName(productDetails.getProductName());
                 product.setDescription(productDetails.getDescription());
                 product.setSku(productDetails.getSku());
-                product.setPrice(productDetails.getPrice());
+                // Price and stock are now managed at variant level
                 product.setStatus(productDetails.getStatus());
                 
                 Product updatedProduct = productRepository.save(product);
@@ -261,15 +252,9 @@ public class ProductController {
         @Size(max = 50, message = "SKU must not exceed 50 characters")
         private String sku;
         
-        @NotBlank(message = "Price is required")
-        private String price;
-        
-        @NotNull(message = "Stock quantity is required")
-        @Min(value = 0, message = "Stock quantity must be non-negative")
-        private Integer stockQuantity;
-        
         private String status;
         private String imageUrl;
+        private String thumbnailUrl;
         
         @NotNull(message = "Category ID is required")
         private Long categoryId;
@@ -287,17 +272,14 @@ public class ProductController {
         public String getSku() { return sku; }
         public void setSku(String sku) { this.sku = sku; }
         
-        public String getPrice() { return price; }
-        public void setPrice(String price) { this.price = price; }
-        
-        public Integer getStockQuantity() { return stockQuantity; }
-        public void setStockQuantity(Integer stockQuantity) { this.stockQuantity = stockQuantity; }
-        
         public String getStatus() { return status; }
         public void setStatus(String status) { this.status = status; }
         
         public String getImageUrl() { return imageUrl; }
         public void setImageUrl(String imageUrl) { this.imageUrl = imageUrl; }
+        
+        public String getThumbnailUrl() { return thumbnailUrl; }
+        public void setThumbnailUrl(String thumbnailUrl) { this.thumbnailUrl = thumbnailUrl; }
         
         public Long getCategoryId() { return categoryId; }
         public void setCategoryId(Long categoryId) { this.categoryId = categoryId; }
@@ -491,8 +473,9 @@ class ProductDto {
         dto.productName = p.getProductName();
         dto.description = p.getDescription();
         dto.sku = p.getSku();
-        dto.price = p.getPrice() != null ? p.getPrice().doubleValue() : null;
-        dto.stockQuantity = p.getStockQuantity();
+        // Price and stock are now managed at variant level
+        dto.price = null; // Will be managed at variant level
+        dto.stockQuantity = null; // Will be managed at variant level
         dto.status = p.getStatus() != null ? p.getStatus().name() : null;
         dto.imageUrl = p.getImageUrl();
         dto.thumbnailUrl = p.getThumbnailUrl();

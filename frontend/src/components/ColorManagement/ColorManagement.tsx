@@ -27,11 +27,11 @@ import {
   ExportOutlined,
   ExclamationCircleOutlined,
 } from '@ant-design/icons';
-import { colorApi } from '../../services/api';
+import { colorApi } from '../../services/api.ts';
 import { Color, CreateColorRequest, UpdateColorRequest } from '../../types';
-import { PAGINATION_CONFIG, VALIDATION_RULES, COMMON_COLORS } from '../../utils/constants';
-import { useMutation } from '../../hooks/useApi';
-import { playSound } from '../../utils/sound';
+import { PAGINATION_CONFIG, VALIDATION_RULES, COMMON_COLORS } from '../../utils/constants.ts';
+import { useMutation } from '../../hooks/useApi.ts';
+import { playSound } from '../../utils/sound.ts';
 
 const { Title, Text } = Typography;
 

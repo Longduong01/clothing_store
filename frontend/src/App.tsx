@@ -5,8 +5,8 @@ import AppLayout from './components/Layout/AppLayout';
 import Dashboard from './pages/Dashboard';
 import UserManagement from './components/UserManagement/UserManagement';
 import SizeManagement from './components/SizeManagement/SizeManagement';
-import ColorManagement from './components/ColorManagement/ColorManagement';
-import BrandManagement from './components/BrandManagement/BrandManagement';
+import ColorManagement from './components/ColorManagement/ColorManagement.tsx';
+import BrandManagement from './components/BrandManagement/BrandManagement.tsx';
 import ProductManagement from './components/ProductManagement/ProductManagement';
 import CategoryManagement from './components/CategoryManagement/CategoryManagement';
 

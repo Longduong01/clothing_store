@@ -2,9 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { Card, Table, Button, Space, Input, Modal, Form, notification, Typography, Row, Col, Statistic, Tooltip, Tag } from 'antd';
 import { PlusOutlined, SearchOutlined, EditOutlined, DeleteOutlined, ShoppingOutlined, ReloadOutlined } from '@ant-design/icons';
 import { Brand } from '../../types';
-import { brandApi } from '../../services/api';
-import { useMutation } from '../../hooks/useApi';
-import { playSound } from '../../utils/sound';
+import { brandApi } from '../../services/api.ts';
+import { useMutation } from '../../hooks/useApi.ts';
+import { playSound } from '../../utils/sound.ts';
 
 const { Title, Text } = Typography;
 

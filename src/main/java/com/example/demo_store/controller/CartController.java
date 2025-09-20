@@ -62,7 +62,7 @@ public class CartController {
         }
     }
 
-    // POST /api/carts/user/{userId}/items - Thêm sản phẩm vào giỏ hàng
+    // POST /api/carts/user/{userId}/items - Thêm biến thể sản phẩm vào giỏ hàng
     @PostMapping("/user/{userId}/items")
     public ResponseEntity<?> addItemToCart(@PathVariable Long userId, @RequestBody AddItemRequest request) {
         try {
@@ -95,7 +95,7 @@ public class CartController {
                 cartItem.setCart(cart);
                 cartItem.setProduct(product);
                 cartItem.setQuantity(request.getQuantity());
-                cartItem.setPrice(product.getPrice());
+                cartItem.setPrice(BigDecimal.ZERO); // Price is now managed at variant level
                 cartItem.setCreatedAt(LocalDateTime.now());
                 cartItem.setUpdatedAt(LocalDateTime.now());
                 cartItemRepository.save(cartItem);
