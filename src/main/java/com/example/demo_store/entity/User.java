@@ -49,6 +49,10 @@ public class User {
     @Column(name = "role", nullable = false, length = 20)
     private UserRole role = UserRole.CUSTOMER;
     
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false, length = 20)
+    private UserStatus status = UserStatus.ACTIVE;
+    
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -59,5 +63,9 @@ public class User {
     
     public enum UserRole {
         CUSTOMER, ADMIN
+    }
+    
+    public enum UserStatus {
+        ACTIVE, INACTIVE, SUSPENDED
     }
 }

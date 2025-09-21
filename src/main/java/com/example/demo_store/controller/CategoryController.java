@@ -16,11 +16,16 @@ public class CategoryController {
     @Autowired
     private CategoryRepository categoryRepository;
     
-    // GET /api/categories - Lấy tất cả categories
+    // GET /api/categories - Lấy tất cả categories (mặc định chỉ active)
     @GetMapping
-    public ResponseEntity<List<Category>> getAllCategories() {
+    public ResponseEntity<List<Category>> getAllCategories(@RequestParam(defaultValue = "false") boolean includeInactive) {
         try {
-            List<Category> categories = categoryRepository.findAll();
+            List<Category> categories;
+            if (includeInactive) {
+                categories = categoryRepository.findAll();
+            } else {
+                categories = categoryRepository.findByStatus(Category.CategoryStatus.ACTIVE);
+            }
             return ResponseEntity.ok(categories);
         } catch (Exception e) {
             return ResponseEntity.status(500).build();
@@ -50,11 +55,16 @@ public class CategoryController {
         }
     }
     
-    // GET /api/categories/root - Lấy categories gốc (không có parent)
+    // GET /api/categories/root - Lấy categories gốc (không có parent, chỉ active)
     @GetMapping("/root")
-    public ResponseEntity<List<Category>> getRootCategories() {
+    public ResponseEntity<List<Category>> getRootCategories(@RequestParam(defaultValue = "false") boolean includeInactive) {
         try {
-            List<Category> categories = categoryRepository.findByParentIsNull();
+            List<Category> categories;
+            if (includeInactive) {
+                categories = categoryRepository.findByParentIsNull();
+            } else {
+                categories = categoryRepository.findByStatusAndParentIsNull(Category.CategoryStatus.ACTIVE);
+            }
             return ResponseEntity.ok(categories);
         } catch (Exception e) {
             return ResponseEntity.status(500).build();
@@ -89,6 +99,9 @@ public class CategoryController {
     @PutMapping("/{id}")
     public ResponseEntity<Category> updateCategory(@PathVariable Long id, @RequestBody CategoryCreateRequest request) {
         try {
+            System.out.println("Updating category ID: " + id);
+            System.out.println("Request data: " + request.getCategoryName() + ", parentId: " + request.getParentId());
+            
             Optional<Category> categoryOptional = categoryRepository.findById(id);
             if (categoryOptional.isPresent()) {
                 Category category = categoryOptional.get();
@@ -97,17 +110,49 @@ public class CategoryController {
                 category.setImageUrl(request.getImageUrl());
                 
                 // Update parent category if provided
-                if (request.getParentId() != null) {
+                if (request.getParentId() != null && request.getParentId() > 0) {
                     Optional<Category> parentCategory = categoryRepository.findById(request.getParentId());
                     if (parentCategory.isPresent()) {
                         category.setParent(parentCategory.get());
+                        System.out.println("Set parent to: " + parentCategory.get().getCategoryName());
+                    } else {
+                        System.out.println("Parent category not found with ID: " + request.getParentId());
                     }
                 } else {
                     category.setParent(null);
+                    System.out.println("Set parent to null");
+                }
+                
+                // Update status if provided
+                if (request.getStatus() != null) {
+                    category.setStatus(Category.CategoryStatus.valueOf(request.getStatus()));
                 }
                 
                 Category updatedCategory = categoryRepository.save(category);
+                System.out.println("Updated category: " + updatedCategory.getCategoryName() + 
+                                 ", parent: " + (updatedCategory.getParent() != null ? updatedCategory.getParent().getCategoryName() : "null"));
                 return ResponseEntity.ok(updatedCategory);
+            } else {
+                System.out.println("Category not found with ID: " + id);
+                return ResponseEntity.notFound().build();
+            }
+        } catch (Exception e) {
+            System.out.println("Error updating category: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(500).build();
+        }
+    }
+    
+    // DELETE /api/categories/{id} - Soft delete category (set status to INACTIVE)
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteCategory(@PathVariable Long id) {
+        try {
+            Optional<Category> categoryOptional = categoryRepository.findById(id);
+            if (categoryOptional.isPresent()) {
+                Category category = categoryOptional.get();
+                category.setStatus(Category.CategoryStatus.INACTIVE);
+                categoryRepository.save(category);
+                return ResponseEntity.ok().build();
             } else {
                 return ResponseEntity.notFound().build();
             }
@@ -116,16 +161,13 @@ public class CategoryController {
         }
     }
     
-    // DELETE /api/categories/{id} - Xóa category
-    @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteCategory(@PathVariable Long id) {
+    // GET /api/categories/name/{name} - Lấy category theo tên (phục vụ unique check FE)
+    @GetMapping("/name/{name}")
+    public ResponseEntity<Category> getCategoryByName(@PathVariable String name) {
         try {
-            if (categoryRepository.existsById(id)) {
-                categoryRepository.deleteById(id);
-                return ResponseEntity.ok().build();
-            } else {
-                return ResponseEntity.notFound().build();
-            }
+            Optional<Category> category = categoryRepository.findByCategoryName(name);
+            return category.map(ResponseEntity::ok)
+                         .orElse(ResponseEntity.notFound().build());
         } catch (Exception e) {
             return ResponseEntity.status(500).build();
         }
@@ -148,6 +190,7 @@ public class CategoryController {
         private String description;
         private String imageUrl;
         private Long parentId;
+        private String status;
         
         // Constructors
         public CategoryCreateRequest() {}
@@ -171,5 +214,8 @@ public class CategoryController {
         
         public Long getParentId() { return parentId; }
         public void setParentId(Long parentId) { this.parentId = parentId; }
+        
+        public String getStatus() { return status; }
+        public void setStatus(String status) { this.status = status; }
     }
 }

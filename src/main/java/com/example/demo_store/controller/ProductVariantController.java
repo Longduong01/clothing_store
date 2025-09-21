@@ -22,7 +22,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
-import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -46,6 +45,9 @@ public class ProductVariantController {
     
     @Autowired
     private ProductStatusService productStatusService;
+    
+    @Autowired
+    private com.example.demo_store.service.ProductCountService productCountService;
     
     // Upload directory
     private static final String UPLOAD_DIR = "uploads/variants/";
@@ -82,7 +84,7 @@ public class ProductVariantController {
             @RequestParam("productId") Long productId,
             @RequestParam("sizeId") Long sizeId,
             @RequestParam("colorId") Long colorId,
-            @RequestParam("price") BigDecimal price,
+            @RequestParam("price") String priceStr,
             @RequestParam("stock") Integer stock,
             @RequestParam(value = "status", defaultValue = "ACTIVE") String status,
             @RequestParam(value = "image", required = false) MultipartFile image) {
@@ -105,11 +107,19 @@ public class ProductVariantController {
                 return ResponseEntity.badRequest().build();
             }
             
+            // Convert price string to BigDecimal
+            BigDecimal price;
+            try {
+                price = new BigDecimal(priceStr);
+            } catch (NumberFormatException e) {
+                return ResponseEntity.badRequest().build();
+            }
+            
             // Kiểm tra biến thể đã tồn tại chưa
             List<ProductVariant> existingVariants = variantRepository.findByProductAndSizeAndColor(
                 productId, sizeId, colorId);
             if (!existingVariants.isEmpty()) {
-                return ResponseEntity.badRequest().build();
+                return ResponseEntity.status(400).body(null);
             }
             
             // Luôn tự động tạo SKU
@@ -138,6 +148,9 @@ public class ProductVariantController {
             variant.setImagePath(imagePath);
             
             ProductVariant savedVariant = variantRepository.save(variant);
+            
+            // Update product counts for size and color
+            productCountService.updateVariantCounts(savedVariant);
             
             // Tự động cập nhật trạng thái sản phẩm
             productStatusService.updateProductStatusBasedOnVariants(productId);
@@ -182,15 +195,30 @@ public class ProductVariantController {
                 }
             }
             
+            // Lưu size/color cũ để so sánh
+            Long oldSizeId = variant.getSize().getSizeId();
+            Long oldColorId = variant.getColor().getColorId();
+            
             // Cập nhật thông tin
-            variant.setSku(request.getSku());
             variant.setSize(size.get());
             variant.setColor(color.get());
+            
+            // Tự động tạo lại SKU nếu thay đổi size hoặc color
+            if (!oldSizeId.equals(request.getSizeId()) || !oldColorId.equals(request.getColorId())) {
+                String newSku = generateSku(variant.getProduct().getSku(), color.get().getColorName(), size.get().getSizeName());
+                variant.setSku(newSku);
+            } else {
+                // Nếu không thay đổi size/color thì giữ nguyên SKU từ request
+                variant.setSku(request.getSku());
+            }
             variant.setPrice(request.getPrice());
             variant.setStock(request.getStock());
             variant.setStatus(ProductVariant.VariantStatus.valueOf(request.getStatus()));
             
             ProductVariant updatedVariant = variantRepository.save(variant);
+            
+            // Update product counts for size and color
+            productCountService.updateVariantCounts(updatedVariant);
             
             // Tự động cập nhật trạng thái sản phẩm
             productStatusService.updateProductStatusBasedOnVariants(variant.getProduct().getProductId());
@@ -202,7 +230,7 @@ public class ProductVariantController {
         }
     }
     
-    // DELETE /api/variants/{id} - Xóa biến thể
+    // DELETE /api/variants/{id} - Soft delete variant (set status to INACTIVE)
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteVariant(@PathVariable Long id) {
         try {
@@ -211,7 +239,12 @@ public class ProductVariantController {
                 ProductVariant variant = variantOptional.get();
                 Long productId = variant.getProduct().getProductId();
                 
-                variantRepository.deleteById(id);
+                // Soft delete: chuyển status thành INACTIVE thay vì xóa hẳn
+                variant.setStatus(ProductVariant.VariantStatus.INACTIVE);
+                variantRepository.save(variant);
+                
+                // Update product counts after soft delete
+                productCountService.updateVariantCounts(variant);
                 
                 // Tự động cập nhật trạng thái sản phẩm
                 productStatusService.updateProductStatusBasedOnVariants(productId);
@@ -354,11 +387,38 @@ public class ProductVariantController {
     
     private String normalizeString(String input) {
         if (input == null) return "";
-        // Remove accents and special characters
-        String normalized = Normalizer.normalize(input, Normalizer.Form.NFD);
-        return normalized.replaceAll("[^\\p{ASCII}]", "")
-                        .replaceAll("[^a-zA-Z0-9]", "")
-                        .toUpperCase();
+        
+        // Convert to uppercase first
+        String result = input.toUpperCase().trim();
+        
+        // Map Vietnamese characters to ASCII equivalents
+        result = result.replace("À", "A").replace("Á", "A").replace("Ạ", "A").replace("Ả", "A").replace("Ã", "A");
+        result = result.replace("Â", "A").replace("Ầ", "A").replace("Ấ", "A").replace("Ậ", "A").replace("Ẩ", "A").replace("Ẫ", "A");
+        result = result.replace("Ă", "A").replace("Ằ", "A").replace("Ắ", "A").replace("Ặ", "A").replace("Ẳ", "A").replace("Ẵ", "A");
+        
+        result = result.replace("È", "E").replace("É", "E").replace("Ẹ", "E").replace("Ẻ", "E").replace("Ẽ", "E");
+        result = result.replace("Ê", "E").replace("Ề", "E").replace("Ế", "E").replace("Ệ", "E").replace("Ể", "E").replace("Ễ", "E");
+        
+        result = result.replace("Ì", "I").replace("Í", "I").replace("Ị", "I").replace("Ỉ", "I").replace("Ĩ", "I");
+        
+        result = result.replace("Ò", "O").replace("Ó", "O").replace("Ọ", "O").replace("Ỏ", "O").replace("Õ", "O");
+        result = result.replace("Ô", "O").replace("Ồ", "O").replace("Ố", "O").replace("Ộ", "O").replace("Ổ", "O").replace("Ỗ", "O");
+        result = result.replace("Ơ", "O").replace("Ờ", "O").replace("Ớ", "O").replace("Ợ", "O").replace("Ở", "O").replace("Ỡ", "O");
+        
+        result = result.replace("Ù", "U").replace("Ú", "U").replace("Ụ", "U").replace("Ủ", "U").replace("Ũ", "U");
+        result = result.replace("Ư", "U").replace("Ừ", "U").replace("Ứ", "U").replace("Ự", "U").replace("Ử", "U").replace("Ữ", "U");
+        
+        result = result.replace("Ỳ", "Y").replace("Ý", "Y").replace("Ỵ", "Y").replace("Ỷ", "Y").replace("Ỹ", "Y");
+        
+        result = result.replace("Đ", "D");
+        
+        // Remove any remaining special characters except letters, numbers, and hyphens
+        result = result.replaceAll("[^A-Z0-9\\-]", "");
+        
+        // Remove multiple consecutive hyphens and trim
+        result = result.replaceAll("-+", "-").replaceAll("^-|-$", "");
+        
+        return result;
     }
     
     private String saveImage(MultipartFile image) throws IOException {
@@ -427,7 +487,7 @@ public class ProductVariantController {
         private Long colorId;
         
         @NotBlank(message = "SKU is required")
-        @jakarta.validation.constraints.Size(max = 100, message = "SKU must not exceed 100 characters")
+        @Size(max = 100, message = "SKU must not exceed 100 characters")
         private String sku;
         
         @NotNull(message = "Price is required")
@@ -464,7 +524,7 @@ public class ProductVariantController {
     
     public static class ProductVariantUpdateRequest {
         @NotBlank(message = "SKU is required")
-        @jakarta.validation.constraints.Size(max = 100, message = "SKU must not exceed 100 characters")
+        @Size(max = 100, message = "SKU must not exceed 100 characters")
         private String sku;
         
         @NotNull(message = "Size ID is required")

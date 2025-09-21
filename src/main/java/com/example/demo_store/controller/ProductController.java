@@ -3,12 +3,15 @@ package com.example.demo_store.controller;
 import com.example.demo_store.entity.Product;
 import com.example.demo_store.entity.Category;
 import com.example.demo_store.entity.Brand;
+import com.example.demo_store.entity.Gender;
 import com.example.demo_store.entity.ProductImage;
 import com.example.demo_store.dto.ProductDTO;
+import com.example.demo_store.dto.ProductCreateRequest;
 import com.example.demo_store.dto.ProductUpdateRequest;
 import com.example.demo_store.repository.ProductRepository;
 import com.example.demo_store.repository.CategoryRepository;
 import com.example.demo_store.repository.BrandRepository;
+import com.example.demo_store.repository.GenderRepository;
 import com.example.demo_store.service.FileStorageService;
 import com.example.demo_store.service.ProductImageService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,11 +19,12 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.*;
 
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.HashSet;
 
 @RestController
 @RequestMapping("/api/products")
@@ -36,6 +40,9 @@ public class ProductController {
     private BrandRepository brandRepository;
     
     @Autowired
+    private GenderRepository genderRepository;
+    
+    @Autowired
     private FileStorageService fileStorageService;
     
     @Autowired
@@ -43,6 +50,9 @@ public class ProductController {
     
     @Autowired
     private com.example.demo_store.repository.ProductVariantRepository productVariantRepository;
+    
+    @Autowired
+    private com.example.demo_store.service.ProductCountService productCountService;
     
     // Tính tổng tồn kho từ các variants của sản phẩm
     private Integer calculateTotalStock(Long productId) {
@@ -184,24 +194,22 @@ public class ProductController {
     
     // POST /api/products - Tạo product mới (parent product)
     @PostMapping
-    public ResponseEntity<Product> createProduct(@Valid @RequestBody ProductCreateRequest request) {
+    public ResponseEntity<ProductDTO> createProduct(@Valid @RequestBody ProductCreateRequest request) {
         try {
             Product product = new Product();
             product.setProductName(request.getProductName());
             product.setDescription(request.getDescription());
             product.setSku(request.getSku());
-            // Price and stock are now managed at variant level
             product.setStatus(Product.ProductStatus.valueOf(request.getStatus()));
-            product.setImageUrl(request.getImageUrl());
-            product.setThumbnailUrl(request.getThumbnailUrl());
-            
-            // Set category
-            if (request.getCategoryId() != null) {
-                Optional<Category> category = categoryRepository.findById(request.getCategoryId());
-                if (category.isPresent()) {
-                    product.setCategory(category.get());
+            // Set gender
+            if (request.getGenderId() != null) {
+                Optional<Gender> gender = genderRepository.findById(request.getGenderId());
+                if (gender.isPresent()) {
+                    product.setGender(gender.get());
                 }
             }
+            product.setImageUrl(request.getImageUrl());
+            product.setThumbnailUrl(request.getThumbnailUrl());
             
             // Set brand
             if (request.getBrandId() != null) {
@@ -211,8 +219,36 @@ public class ProductController {
                 }
             }
             
+            // Set multiple categories
+            if (request.getCategoryIds() != null && !request.getCategoryIds().isEmpty()) {
+                Set<Category> categories = new HashSet<>();
+                for (Long categoryId : request.getCategoryIds()) {
+                    Optional<Category> category = categoryRepository.findById(categoryId);
+                    if (category.isPresent()) {
+                        categories.add(category.get());
+                    }
+                }
+                product.setCategories(categories);
+            }
+            
+            // Set single category for backward compatibility
+            if (request.getCategoryId() != null) {
+                Optional<Category> category = categoryRepository.findById(request.getCategoryId());
+                if (category.isPresent()) {
+                    product.setCategory(category.get());
+                }
+            }
+            
             Product savedProduct = productRepository.save(product);
-            return ResponseEntity.ok(savedProduct);
+            
+            // Update product counts for categories and brand
+            productCountService.updateProductCounts(savedProduct);
+            
+            // Calculate total stock and return as DTO
+            ProductDTO productDTO = ProductDTO.fromEntity(savedProduct);
+            productDTO.setTotalStock(calculateTotalStock(savedProduct.getProductId()));
+            
+            return ResponseEntity.ok(productDTO);
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.status(500).build();
@@ -233,19 +269,50 @@ public class ProductController {
     
     // PUT /api/products/{id} - Cập nhật product
     @PutMapping("/{id}")
-    public ResponseEntity<ProductDto> updateProduct(@PathVariable Long id, @RequestBody ProductUpdateRequest request) {
+    public ResponseEntity<ProductDTO> updateProduct(@PathVariable Long id, @RequestBody ProductUpdateRequest request) {
         try {
             Optional<Product> productOptional = productRepository.findById(id);
             if (productOptional.isPresent()) {
                 Product product = productOptional.get();
-                product.setProductName(request.getProductName());
-                product.setDescription(request.getDescription());
-                product.setSku(request.getSku());
-                product.setStatus(Product.ProductStatus.valueOf(request.getStatus()));
-                product.setImageUrl(request.getImageUrl());
-                product.setThumbnailUrl(request.getThumbnailUrl());
                 
-                // Update category if provided
+                if (request.getProductName() != null) {
+                    product.setProductName(request.getProductName());
+                }
+                if (request.getDescription() != null) {
+                    product.setDescription(request.getDescription());
+                }
+                if (request.getSku() != null) {
+                    product.setSku(request.getSku());
+                }
+                if (request.getStatus() != null) {
+                    product.setStatus(Product.ProductStatus.valueOf(request.getStatus()));
+                }
+                if (request.getGenderId() != null) {
+                    Optional<Gender> gender = genderRepository.findById(request.getGenderId());
+                    if (gender.isPresent()) {
+                        product.setGender(gender.get());
+                    }
+                }
+                if (request.getImageUrl() != null) {
+                    product.setImageUrl(request.getImageUrl());
+                }
+                if (request.getThumbnailUrl() != null) {
+                    product.setThumbnailUrl(request.getThumbnailUrl());
+                }
+                
+                // Update multiple categories if provided
+                if (request.getCategoryIds() != null && !request.getCategoryIds().isEmpty()) {
+                    Set<Category> categories = new HashSet<>();
+                    for (Long categoryId : request.getCategoryIds()) {
+                        Optional<Category> category = categoryRepository.findById(categoryId);
+                        if (category.isPresent()) {
+                            categories.add(category.get());
+                        }
+                    }
+                    product.setCategories(categories);
+                }
+                
+                // Update single category for backward compatibility
                 if (request.getCategoryId() != null) {
                     Optional<Category> category = categoryRepository.findById(request.getCategoryId());
                     if (category.isPresent()) {
@@ -262,7 +329,15 @@ public class ProductController {
                 }
                 
                 Product updatedProduct = productRepository.save(product);
-                return ResponseEntity.ok(ProductDto.fromEntity(updatedProduct));
+                
+                // Update product counts for categories and brand
+                productCountService.updateProductCounts(updatedProduct);
+                
+                // Calculate total stock and return as DTO
+                ProductDTO productDTO = ProductDTO.fromEntity(updatedProduct);
+                productDTO.setTotalStock(calculateTotalStock(updatedProduct.getProductId()));
+                
+                return ResponseEntity.ok(productDTO);
             } else {
                 return ResponseEntity.notFound().build();
             }
@@ -282,6 +357,10 @@ public class ProductController {
                 // Soft delete: chuyển status thành INACTIVE thay vì xóa hẳn
                 product.setStatus(Product.ProductStatus.INACTIVE);
                 productRepository.save(product);
+                
+                // Update product counts after soft delete
+                productCountService.updateProductCounts(product);
+                
                 return ResponseEntity.ok().build();
             } else {
                 return ResponseEntity.notFound().build();
@@ -304,53 +383,6 @@ public class ProductController {
     }
     
     // Request/Response classes
-    public static class ProductCreateRequest {
-        @NotBlank(message = "Product name is required")
-        @Size(max = 200, message = "Product name must not exceed 200 characters")
-        private String productName;
-        
-        @Size(max = 1000, message = "Description must not exceed 1000 characters")
-        private String description;
-        
-        @NotBlank(message = "SKU is required")
-        @Size(max = 50, message = "SKU must not exceed 50 characters")
-        private String sku;
-        
-        private String status;
-        private String imageUrl;
-        private String thumbnailUrl;
-        
-        @NotNull(message = "Category ID is required")
-        private Long categoryId;
-        
-        @NotNull(message = "Brand ID is required")
-        private Long brandId;
-        
-        // Getters and setters
-        public String getProductName() { return productName; }
-        public void setProductName(String productName) { this.productName = productName; }
-        
-        public String getDescription() { return description; }
-        public void setDescription(String description) { this.description = description; }
-        
-        public String getSku() { return sku; }
-        public void setSku(String sku) { this.sku = sku; }
-        
-        public String getStatus() { return status; }
-        public void setStatus(String status) { this.status = status; }
-        
-        public String getImageUrl() { return imageUrl; }
-        public void setImageUrl(String imageUrl) { this.imageUrl = imageUrl; }
-        
-        public String getThumbnailUrl() { return thumbnailUrl; }
-        public void setThumbnailUrl(String thumbnailUrl) { this.thumbnailUrl = thumbnailUrl; }
-        
-        public Long getCategoryId() { return categoryId; }
-        public void setCategoryId(Long categoryId) { this.categoryId = categoryId; }
-        
-        public Long getBrandId() { return brandId; }
-        public void setBrandId(Long brandId) { this.brandId = brandId; }
-    }
     
     public static class ImageUploadResponse {
         private String fileName;
@@ -466,6 +498,38 @@ public class ProductController {
             ));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(new ErrorResponse("Failed to reorder images: " + e.getMessage()));
+        }
+    }
+    
+    // POST /api/products/{id}/thumbnail - Upload thumbnail cho sản phẩm
+    @PostMapping(value = "/{id}/thumbnail", consumes = "multipart/form-data")
+    public ResponseEntity<?> uploadThumbnail(
+            @PathVariable Long id,
+            @RequestParam("thumbnail") MultipartFile thumbnail) {
+        try {
+            // Kiểm tra product tồn tại
+            Optional<Product> product = productRepository.findById(id);
+            if (!product.isPresent()) {
+                return ResponseEntity.notFound().build();
+            }
+            
+            // Lưu thumbnail file
+            String thumbnailUrl = fileStorageService.storeFile(thumbnail);
+            
+            // Cập nhật thumbnailUrl trong product
+            Product productEntity = product.get();
+            productEntity.setThumbnailUrl(thumbnailUrl);
+            productRepository.save(productEntity);
+            
+            return ResponseEntity.ok().body(Map.of(
+                "message", "Thumbnail uploaded successfully",
+                "thumbnailUrl", thumbnailUrl
+            ));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).body(Map.of(
+                "error", "Failed to upload thumbnail: " + e.getMessage()
+            ));
         }
     }
     

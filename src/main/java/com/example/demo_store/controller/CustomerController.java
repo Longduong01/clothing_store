@@ -45,7 +45,7 @@ public class CustomerController {
             if (customerType != null && gender != null) {
                 customers = customerRepository.findByCustomerTypeAndGender(
                     Customer.CustomerType.valueOf(customerType), 
-                    Customer.Gender.valueOf(gender), 
+                    Customer.CustomerGender.valueOf(gender), 
                     pageable
                 );
             } else if (customerType != null) {
@@ -55,7 +55,7 @@ public class CustomerController {
                 );
             } else if (gender != null) {
                 customers = customerRepository.findByGender(
-                    Customer.Gender.valueOf(gender), 
+                    Customer.CustomerGender.valueOf(gender), 
                     pageable
                 );
             } else {
@@ -284,7 +284,7 @@ public class CustomerController {
         private String phone;
         private String email;
         private java.time.LocalDate dateOfBirth;
-        private Customer.Gender gender;
+        private Customer.CustomerGender gender;
         private String address;
         private String city;
         private String stateProvince;
@@ -312,8 +312,8 @@ public class CustomerController {
         public java.time.LocalDate getDateOfBirth() { return dateOfBirth; }
         public void setDateOfBirth(java.time.LocalDate dateOfBirth) { this.dateOfBirth = dateOfBirth; }
         
-        public Customer.Gender getGender() { return gender; }
-        public void setGender(Customer.Gender gender) { this.gender = gender; }
+        public Customer.CustomerGender getGender() { return gender; }
+        public void setGender(Customer.CustomerGender gender) { this.gender = gender; }
         
         public String getAddress() { return address; }
         public void setAddress(String address) { this.address = address; }
@@ -343,7 +343,7 @@ public class CustomerController {
         private String phone;
         private String email;
         private java.time.LocalDate dateOfBirth;
-        private Customer.Gender gender;
+        private Customer.CustomerGender gender;
         private String address;
         private String city;
         private String stateProvince;
@@ -369,8 +369,8 @@ public class CustomerController {
         public java.time.LocalDate getDateOfBirth() { return dateOfBirth; }
         public void setDateOfBirth(java.time.LocalDate dateOfBirth) { this.dateOfBirth = dateOfBirth; }
         
-        public Customer.Gender getGender() { return gender; }
-        public void setGender(Customer.Gender gender) { this.gender = gender; }
+        public Customer.CustomerGender getGender() { return gender; }
+        public void setGender(Customer.CustomerGender gender) { this.gender = gender; }
         
         public String getAddress() { return address; }
         public void setAddress(String address) { this.address = address; }

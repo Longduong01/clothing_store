@@ -35,4 +35,10 @@ public interface SizeRepository extends JpaRepository<Size, Long> {
     // Find sizes by numeric range (for clothing sizes like S, M, L, XL, etc.)
     @Query("SELECT s FROM Size s WHERE s.sizeName IN :sizeNames")
     List<Size> findBySizeNameIn(@Param("sizeNames") List<String> sizeNames);
+    
+    // Soft delete support
+    List<Size> findByStatus(Size.SizeStatus status);
+    
+    @Query("SELECT s FROM Size s WHERE s.status = :status ORDER BY s.sizeName")
+    List<Size> findByStatusOrderBySizeName(@Param("status") Size.SizeStatus status);
 }

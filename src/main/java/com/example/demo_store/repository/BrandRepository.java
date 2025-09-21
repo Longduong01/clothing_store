@@ -10,4 +10,7 @@ import java.util.Optional;
 public interface BrandRepository extends JpaRepository<Brand, Long> {
     
     Optional<Brand> findByBrandName(String brandName);
+    
+    // Soft delete support
+    java.util.List<Brand> findByStatus(Brand.BrandStatus status);
 }

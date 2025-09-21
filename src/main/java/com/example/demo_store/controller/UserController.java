@@ -18,11 +18,16 @@ public class UserController {
     @Autowired
     private UserRepository userRepository;
     
-    // GET /api/users - Lấy tất cả users
+    // GET /api/users - Lấy tất cả users (mặc định chỉ ACTIVE, có thể includeInactive)
     @GetMapping
-    public ResponseEntity<List<UserDTO>> getAllUsers() {
+    public ResponseEntity<List<UserDTO>> getAllUsers(@RequestParam(defaultValue = "false") boolean includeInactive) {
         try {
-            List<User> users = userRepository.findAll();
+            List<User> users;
+            if (includeInactive) {
+                users = userRepository.findAll();
+            } else {
+                users = userRepository.findByStatus(User.UserStatus.ACTIVE);
+            }
             List<UserDTO> userDTOs = users.stream()
                     .map(UserDTO::fromEntity)
                     .collect(Collectors.toList());
@@ -109,12 +114,15 @@ public class UserController {
         }
     }
     
-    // DELETE /api/users/{id} - Xóa user
+    // DELETE /api/users/{id} - Soft delete user (set status to INACTIVE)
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteUser(@PathVariable Long id) {
         try {
-            if (userRepository.existsById(id)) {
-                userRepository.deleteById(id);
+            Optional<User> userOptional = userRepository.findById(id);
+            if (userOptional.isPresent()) {
+                User user = userOptional.get();
+                user.setStatus(User.UserStatus.INACTIVE);
+                userRepository.save(user);
                 return ResponseEntity.ok().build();
             } else {
                 return ResponseEntity.notFound().build();

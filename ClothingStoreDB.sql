@@ -39,9 +39,11 @@ CREATE TABLE Categories (
     image_url NVARCHAR(500),
     description NVARCHAR(MAX),
     parent_id INT NULL,
+    status NVARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
     created_at DATETIME2 DEFAULT GETDATE(),
     updated_at DATETIME2 DEFAULT GETDATE(),
-    CONSTRAINT FK_Categories_Parent FOREIGN KEY (parent_id) REFERENCES Categories(category_id)
+    CONSTRAINT FK_Categories_Parent FOREIGN KEY (parent_id) REFERENCES Categories(category_id),
+    CONSTRAINT CHK_Categories_Status CHECK (status IN ('ACTIVE', 'INACTIVE', 'DISCONTINUED'))
 );
 
 -- Bảng Brands
@@ -50,9 +52,10 @@ CREATE TABLE Brands (
     brand_name NVARCHAR(100) NOT NULL,
     logo_url NVARCHAR(500),
     description NVARCHAR(MAX),
-    website NVARCHAR(200),
+    status NVARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
     created_at DATETIME2 DEFAULT GETDATE(),
-    updated_at DATETIME2 DEFAULT GETDATE()
+    updated_at DATETIME2 DEFAULT GETDATE(),
+    CONSTRAINT CHK_Brands_Status CHECK (status IN ('ACTIVE', 'INACTIVE', 'DISCONTINUED'))
 );
 
 -- Bảng Products
@@ -66,26 +69,48 @@ CREATE TABLE Products (
     gallery_images NVARCHAR(MAX),
     stock_quantity INT NOT NULL DEFAULT 0,
     status NVARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
-    category_id INT NOT NULL,
-    brand_id INT NOT NULL,
+    category_id INT NULL,
+    brand_id INT NULL,
+    gender_id INT NULL,
     created_at DATETIME2 DEFAULT GETDATE(),
     updated_at DATETIME2 DEFAULT GETDATE(),
     CONSTRAINT FK_Products_Category FOREIGN KEY (category_id) REFERENCES Categories(category_id),
     CONSTRAINT FK_Products_Brand FOREIGN KEY (brand_id) REFERENCES Brands(brand_id),
-    CONSTRAINT CHK_Products_Status CHECK (status IN ('ACTIVE', 'INACTIVE', 'DISCONTINUED')),
+    CONSTRAINT FK_Products_Gender FOREIGN KEY (gender_id) REFERENCES Genders(gender_id),
+    CONSTRAINT CHK_Products_Status CHECK (status IN ('ACTIVE', 'INACTIVE', 'DISCONTINUED', 'OUT_OF_STOCK')),
     CONSTRAINT CHK_Products_StockQuantity CHECK (stock_quantity >= 0)
 );
 
 -- Bảng Sizes
 CREATE TABLE Sizes (
     size_id INT IDENTITY(1,1) PRIMARY KEY,
-    size_name NVARCHAR(10) NOT NULL UNIQUE
+    size_name NVARCHAR(10) NOT NULL UNIQUE,
+    status NVARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
+    created_at DATETIME2 DEFAULT GETDATE(),
+    updated_at DATETIME2 DEFAULT GETDATE(),
+    CONSTRAINT CHK_Sizes_Status CHECK (status IN ('ACTIVE', 'INACTIVE', 'DISCONTINUED'))
 );
 
 -- Bảng Colors
 CREATE TABLE Colors (
     color_id INT IDENTITY(1,1) PRIMARY KEY,
-    color_name NVARCHAR(50) NOT NULL UNIQUE
+    color_name NVARCHAR(50) NOT NULL UNIQUE,
+    status NVARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
+    created_at DATETIME2 DEFAULT GETDATE(),
+    updated_at DATETIME2 DEFAULT GETDATE(),
+    CONSTRAINT CHK_Colors_Status CHECK (status IN ('ACTIVE', 'INACTIVE', 'DISCONTINUED'))
+);
+
+-- Bảng Genders
+CREATE TABLE Genders (
+    gender_id INT IDENTITY(1,1) PRIMARY KEY,
+    gender_name NVARCHAR(50) NOT NULL,
+    gender_code NVARCHAR(10) NOT NULL UNIQUE,
+    description NVARCHAR(200),
+    status NVARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
+    created_at DATETIME2 DEFAULT GETDATE(),
+    updated_at DATETIME2 DEFAULT GETDATE(),
+    CONSTRAINT CHK_Genders_Status CHECK (status IN ('ACTIVE', 'INACTIVE', 'DISCONTINUED'))
 );
 
 -- Bảng ProductImages
@@ -1118,9 +1143,18 @@ BEGIN
 END
 GO
 
+-- =============================================
+-- Thêm dữ liệu mẫu cho bảng Genders
+-- =============================================
+INSERT INTO Genders (gender_name, gender_code, description, status) VALUES
+('Nam', 'MALE', 'Sản phẩm dành cho nam giới', 'ACTIVE'),
+('Nữ', 'FEMALE', 'Sản phẩm dành cho nữ giới', 'ACTIVE'),
+('Unisex', 'UNISEX', 'Sản phẩm dành cho cả nam và nữ', 'ACTIVE');
+
 PRINT 'Database ClothingStoreDB đã được tạo thành công!';
-PRINT 'Tổng cộng: 17 bảng, 18 views, 10 triggers, 7 stored procedures';
+PRINT 'Tổng cộng: 18 bảng, 18 views, 10 triggers, 7 stored procedures';
 PRINT 'Dữ liệu mẫu đã được thêm vào tất cả các bảng';
 PRINT 'Hỗ trợ multiple images cho sản phẩm (tối đa 10 ảnh/sản phẩm)';
+PRINT 'Đã thêm bảng Genders và cập nhật các bảng với status fields';
 PRINT 'Hỗ trợ ảnh riêng cho từng biến thể sản phẩm';
 PRINT 'Quản lý giá theo biến thể thay vì sản phẩm chung';

@@ -24,11 +24,11 @@ public interface CustomerRepository extends JpaRepository<Customer, Long> {
     Page<Customer> findByCustomerType(Customer.CustomerType customerType, Pageable pageable);
     
     // Find customers by gender
-    Page<Customer> findByGender(Customer.Gender gender, Pageable pageable);
+    Page<Customer> findByGender(Customer.CustomerGender gender, Pageable pageable);
     
     // Find customers by customer type and gender
     Page<Customer> findByCustomerTypeAndGender(Customer.CustomerType customerType, 
-                                               Customer.Gender gender, Pageable pageable);
+                                               Customer.CustomerGender gender, Pageable pageable);
     
     // Find active customers
     List<Customer> findByIsActiveTrue();
@@ -40,7 +40,7 @@ public interface CustomerRepository extends JpaRepository<Customer, Long> {
     long countByCustomerType(Customer.CustomerType customerType);
     
     // Count customers by gender
-    long countByGender(Customer.Gender gender);
+    long countByGender(Customer.CustomerGender gender);
     
     // Count active customers
     long countByIsActive(Boolean isActive);

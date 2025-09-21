@@ -16,11 +16,16 @@ public class BrandController {
     @Autowired
     private BrandRepository brandRepository;
     
-    // GET /api/brands - Lấy tất cả brands
+    // GET /api/brands - Lấy tất cả brands (mặc định chỉ active)
     @GetMapping
-    public ResponseEntity<List<Brand>> getAllBrands() {
+    public ResponseEntity<List<Brand>> getAllBrands(@RequestParam(defaultValue = "false") boolean includeInactive) {
         try {
-            List<Brand> brands = brandRepository.findAll();
+            List<Brand> brands;
+            if (includeInactive) {
+                brands = brandRepository.findAll();
+            } else {
+                brands = brandRepository.findByStatus(Brand.BrandStatus.ACTIVE);
+            }
             return ResponseEntity.ok(brands);
         } catch (Exception e) {
             return ResponseEntity.status(500).build();
@@ -71,6 +76,11 @@ public class BrandController {
                 Brand brand = brandOptional.get();
                 brand.setBrandName(brandDetails.getBrandName());
                 
+                // Update status if provided
+                if (brandDetails.getStatus() != null) {
+                    brand.setStatus(brandDetails.getStatus());
+                }
+                
                 Brand updatedBrand = brandRepository.save(brand);
                 return ResponseEntity.ok(updatedBrand);
             } else {
@@ -81,12 +91,15 @@ public class BrandController {
         }
     }
     
-    // DELETE /api/brands/{id} - Xóa brand
+    // DELETE /api/brands/{id} - Soft delete brand (set status to INACTIVE)
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteBrand(@PathVariable Long id) {
         try {
-            if (brandRepository.existsById(id)) {
-                brandRepository.deleteById(id);
+            Optional<Brand> brandOptional = brandRepository.findById(id);
+            if (brandOptional.isPresent()) {
+                Brand brand = brandOptional.get();
+                brand.setStatus(Brand.BrandStatus.INACTIVE);
+                brandRepository.save(brand);
                 return ResponseEntity.ok().build();
             } else {
                 return ResponseEntity.notFound().build();

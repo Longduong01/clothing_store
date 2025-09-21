@@ -28,4 +28,11 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     // List<Product> findByPriceRange(@Param("minPrice") Double minPrice, @Param("maxPrice") Double maxPrice);
     
     Optional<Product> findBySku(String sku);
+    
+    // Methods for product count calculation
+    @Query("SELECT COUNT(p) FROM Product p WHERE p.brand.brandId = :brandId AND p.status = :status")
+    long countByBrandIdAndStatus(@Param("brandId") Long brandId, @Param("status") Product.ProductStatus status);
+    
+    @Query("SELECT COUNT(p) FROM Product p JOIN p.categories c WHERE c.categoryId = :categoryId AND p.status = :status")
+    long countByCategoryIdAndStatus(@Param("categoryId") Long categoryId, @Param("status") Product.ProductStatus status);
 }

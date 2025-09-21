@@ -43,7 +43,7 @@ public class Customer {
     
     @Enumerated(EnumType.STRING)
     @Column(name = "gender", length = 10)
-    private Gender gender;
+    private CustomerGender gender;
     
     @Column(name = "address", length = 500)
     private String address;
@@ -93,8 +93,8 @@ public class Customer {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
     
-    public enum Gender {
-        Male, Female, Other
+    public enum CustomerGender {
+        MALE, FEMALE, OTHER
     }
     
     public enum CustomerType {

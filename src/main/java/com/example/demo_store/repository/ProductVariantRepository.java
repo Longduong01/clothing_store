@@ -34,4 +34,11 @@ public interface ProductVariantRepository extends JpaRepository<ProductVariant, 
     
     @Query("SELECT v FROM ProductVariant v WHERE v.stock > 0")
     List<ProductVariant> findInStock();
+    
+    // Methods for product count calculation
+    @Query("SELECT COUNT(v) FROM ProductVariant v WHERE v.size.sizeId = :sizeId AND v.status = :status")
+    long countBySizeIdAndStatus(@Param("sizeId") Long sizeId, @Param("status") ProductVariant.VariantStatus status);
+    
+    @Query("SELECT COUNT(v) FROM ProductVariant v WHERE v.color.colorId = :colorId AND v.status = :status")
+    long countByColorIdAndStatus(@Param("colorId") Long colorId, @Param("status") ProductVariant.VariantStatus status);
 }

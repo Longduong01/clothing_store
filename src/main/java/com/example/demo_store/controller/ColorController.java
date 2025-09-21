@@ -1,6 +1,7 @@
 package com.example.demo_store.controller;
 
 import com.example.demo_store.entity.Color;
+import com.example.demo_store.entity.Color.ColorStatus;
 import com.example.demo_store.repository.ColorRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -8,8 +9,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.Map;
-import java.util.HashMap;
 
 @RestController
 @RequestMapping("/api/colors")
@@ -18,11 +17,16 @@ public class ColorController {
     @Autowired
     private ColorRepository colorRepository;
 
-    // GET /api/colors - Lấy tất cả màu sắc
+    // GET /api/colors - Lấy tất cả màu sắc (mặc định chỉ ACTIVE, có thể includeInactive)
     @GetMapping
-    public ResponseEntity<List<Color>> getAllColors() {
+    public ResponseEntity<List<Color>> getAllColors(@RequestParam(defaultValue = "false") boolean includeInactive) {
         try {
-            List<Color> colors = colorRepository.findAll();
+            List<Color> colors;
+            if (includeInactive) {
+                colors = colorRepository.findAll();
+            } else {
+                colors = colorRepository.findByStatus(Color.ColorStatus.ACTIVE);
+            }
             return ResponseEntity.ok(colors);
         } catch (Exception e) {
             return ResponseEntity.status(500).build();
@@ -79,6 +83,11 @@ public class ColorController {
             Color color = colorOptional.get();
             color.setColorName(request.getColorName());
             
+            // Update status if provided
+            if (request.getStatus() != null) {
+                color.setStatus(ColorStatus.valueOf(request.getStatus()));
+            }
+            
             Color updatedColor = colorRepository.save(color);
             return ResponseEntity.ok(updatedColor);
         } catch (Exception e) {
@@ -86,18 +95,21 @@ public class ColorController {
         }
     }
 
-    // DELETE /api/colors/{id} - Xóa màu sắc
+    // DELETE /api/colors/{id} - Soft delete color (set status to INACTIVE)
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteColor(@PathVariable Long id) {
         try {
-            if (!colorRepository.existsById(id)) {
+            Optional<Color> colorOptional = colorRepository.findById(id);
+            if (colorOptional.isPresent()) {
+                Color color = colorOptional.get();
+                color.setStatus(Color.ColorStatus.INACTIVE);
+                colorRepository.save(color);
+                return ResponseEntity.ok(new SuccessResponse("Color deactivated successfully"));
+            } else {
                 return ResponseEntity.notFound().build();
             }
-
-            colorRepository.deleteById(id);
-            return ResponseEntity.ok(new SuccessResponse("Color deleted successfully"));
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(new ErrorResponse("Failed to delete color: " + e.getMessage()));
+            return ResponseEntity.badRequest().body(new ErrorResponse("Failed to deactivate color: " + e.getMessage()));
         }
     }
 
@@ -144,8 +156,12 @@ public class ColorController {
 
     public static class ColorUpdateRequest {
         private String colorName;
+        private String status;
 
         public String getColorName() { return colorName; }
         public void setColorName(String colorName) { this.colorName = colorName; }
+        
+        public String getStatus() { return status; }
+        public void setStatus(String status) { this.status = status; }
     }
 }

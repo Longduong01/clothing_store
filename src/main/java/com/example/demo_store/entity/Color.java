@@ -20,6 +20,17 @@ public class Color {
     @Column(name = "color_name", unique = true, nullable = false, length = 50)
     private String colorName;
     
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false, length = 20)
+    private ColorStatus status = ColorStatus.ACTIVE;
+    
+    @Column(name = "product_count", nullable = false)
+    private Integer productCount = 0;
+    
     // @OneToMany(mappedBy = "color", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     // private List<ProductVariant> variants;
+    
+    public enum ColorStatus {
+        ACTIVE, INACTIVE, DISCONTINUED
+    }
 }

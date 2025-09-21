@@ -11,11 +11,33 @@ export interface User extends BaseEntity {
   email: string;
   phone?: string;
   role: UserRole;
+  status: UserStatus;
 }
 
 export enum UserRole {
   CUSTOMER = 'CUSTOMER',
   ADMIN = 'ADMIN'
+}
+
+export enum UserStatus {
+  ACTIVE = 'ACTIVE',
+  INACTIVE = 'INACTIVE',
+  SUSPENDED = 'SUSPENDED'
+}
+
+// Gender types
+export interface Gender extends BaseEntity {
+  genderId: number;
+  genderName: string;
+  genderCode: string;
+  description?: string;
+  status: string;
+}
+
+export enum GenderStatus {
+  ACTIVE = 'ACTIVE',
+  INACTIVE = 'INACTIVE',
+  DISCONTINUED = 'DISCONTINUED'
 }
 
 export interface CreateUserRequest {
@@ -37,6 +59,8 @@ export interface UpdateUserRequest {
 export interface Size extends BaseEntity {
   sizeId: number;
   sizeName: string;
+  status: SizeStatus;
+  productCount: number;
 }
 
 export interface CreateSizeRequest {
@@ -45,12 +69,21 @@ export interface CreateSizeRequest {
 
 export interface UpdateSizeRequest {
   sizeName: string;
+  status?: SizeStatus;
+}
+
+export enum SizeStatus {
+  ACTIVE = 'ACTIVE',
+  INACTIVE = 'INACTIVE',
+  DISCONTINUED = 'DISCONTINUED'
 }
 
 // Color types
 export interface Color extends BaseEntity {
   colorId: number;
   colorName: string;
+  status: ColorStatus;
+  productCount: number;
 }
 
 export interface CreateColorRequest {
@@ -59,6 +92,13 @@ export interface CreateColorRequest {
 
 export interface UpdateColorRequest {
   colorName: string;
+  status?: ColorStatus;
+}
+
+export enum ColorStatus {
+  ACTIVE = 'ACTIVE',
+  INACTIVE = 'INACTIVE',
+  DISCONTINUED = 'DISCONTINUED'
 }
 
 // Product types
@@ -73,10 +113,40 @@ export interface Product extends BaseEntity {
   stockQuantity?: number; // Optional for parent products
   totalStock?: number; // Tổng tồn kho từ variants
   status: ProductStatus;
+  gender?: Gender;
   categoryName?: string;
   brandName?: string;
+  categories?: Category[]; // Multiple categories support
+  categoriesString?: string; // Comma-separated category names for display
   category?: Category; // Optional for backward compatibility
   brand?: Brand; // Optional for backward compatibility
+}
+
+// Product Request types
+export interface ProductCreateRequest {
+  productName: string;
+  description?: string;
+  sku: string;
+  status: string;
+  genderId?: number;
+  brandId: number;
+  categoryIds?: number[];
+  categoryId?: number; // For backward compatibility
+  imageUrl?: string;
+  thumbnailUrl?: string;
+}
+
+export interface ProductUpdateRequest {
+  productName?: string;
+  sku?: string;
+  status?: string;
+  genderId?: number;
+  description?: string;
+  imageUrl?: string;
+  thumbnailUrl?: string;
+  categoryId?: number;
+  brandId?: number;
+  categoryIds?: number[];
 }
 
 // Product Variant types
@@ -96,6 +166,18 @@ export enum VariantStatus {
   ACTIVE = 'ACTIVE',
   INACTIVE = 'INACTIVE',
   OUT_OF_STOCK = 'OUT_OF_STOCK'
+}
+
+export enum CategoryStatus {
+  ACTIVE = 'ACTIVE',
+  INACTIVE = 'INACTIVE',
+  DISCONTINUED = 'DISCONTINUED'
+}
+
+export enum BrandStatus {
+  ACTIVE = 'ACTIVE',
+  INACTIVE = 'INACTIVE',
+  DISCONTINUED = 'DISCONTINUED'
 }
 
 export interface SimpleRef {
@@ -148,6 +230,8 @@ export interface Category extends BaseEntity {
   imageUrl?: string;
   description?: string;
   parentId?: number;
+  status: CategoryStatus;
+  productCount: number;
 }
 
 export interface Brand extends BaseEntity {
@@ -156,6 +240,8 @@ export interface Brand extends BaseEntity {
   logoUrl?: string;
   description?: string;
   website?: string;
+  status: BrandStatus;
+  productCount: number;
 }
 
 // API Response types

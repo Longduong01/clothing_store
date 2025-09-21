@@ -31,4 +31,10 @@ public interface ColorRepository extends JpaRepository<Color, Long> {
     // Find colors by name pattern
     @Query("SELECT c FROM Color c WHERE LOWER(c.colorName) LIKE LOWER(CONCAT('%', :pattern, '%'))")
     List<Color> findByColorNamePattern(@Param("pattern") String pattern);
+    
+    // Soft delete support
+    List<Color> findByStatus(Color.ColorStatus status);
+    
+    @Query("SELECT c FROM Color c WHERE c.status = :status ORDER BY c.colorName")
+    List<Color> findByStatusOrderByColorName(@Param("status") Color.ColorStatus status);
 }

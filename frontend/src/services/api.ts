@@ -5,6 +5,8 @@ import {
   CreateUserRequest, 
   UpdateUserRequest,
   Product,
+  ProductCreateRequest,
+  ProductUpdateRequest,
   Size,
   CreateSizeRequest,
   UpdateSizeRequest,
@@ -13,6 +15,7 @@ import {
   UpdateColorRequest,
   Brand,
   Category,
+  Gender,
   ProductVariant,
   CreateVariantRequest,
   UpdateVariantRequest,
@@ -68,8 +71,9 @@ api.interceptors.response.use(
 // User API
 export const userApi = {
   // Get all users with pagination
-  getUsers: async (params?: FilterOptions): Promise<User[]> => {
-    const response = await api.get('/users', { params });
+  getUsers: async (params?: FilterOptions, includeInactive: boolean = false): Promise<User[]> => {
+    const queryParams = { ...params, includeInactive };
+    const response = await api.get('/users', { params: queryParams });
     return response.data;
   },
 
@@ -112,8 +116,8 @@ export const userApi = {
 // Size API
 export const sizeApi = {
   // Get all sizes
-  getSizes: async (): Promise<Size[]> => {
-    const response = await api.get('/sizes');
+  getSizes: async (includeInactive: boolean = false): Promise<Size[]> => {
+    const response = await api.get('/sizes', { params: { includeInactive } });
     return response.data;
   },
 
@@ -160,8 +164,8 @@ export const sizeApi = {
 // Color API
 export const colorApi = {
   // Get all colors
-  getColors: async (): Promise<Color[]> => {
-    const response = await api.get('/colors');
+  getColors: async (includeInactive: boolean = false): Promise<Color[]> => {
+    const response = await api.get('/colors', { params: { includeInactive } });
     return response.data;
   },
 
@@ -207,8 +211,8 @@ export const colorApi = {
 
 // Brand API
 export const brandApi = {
-  getBrands: async (): Promise<Brand[]> => {
-    const response = await api.get('/brands');
+  getBrands: async (includeInactive: boolean = false): Promise<Brand[]> => {
+    const response = await api.get('/brands', { params: { includeInactive } });
     return response.data;
   },
   getBrandById: async (id: number): Promise<Brand> => {
@@ -238,8 +242,8 @@ export const brandApi = {
 
 // Category API
 export const categoryApi = {
-  getCategories: async (): Promise<Category[]> => {
-    const response = await api.get('/categories');
+  getCategories: async (includeInactive: boolean = false): Promise<Category[]> => {
+    const response = await api.get('/categories', { params: { includeInactive } });
     return response.data;
   },
   getCategoryById: async (id: number): Promise<Category> => {
@@ -402,6 +406,44 @@ export const testApi = {
       },
     });
     return response.data;
+  },
+};
+
+// Gender API
+export const genderApi = {
+  // Get all genders
+  getGenders: async (includeInactive: boolean = false): Promise<Gender[]> => {
+    const response = await api.get(`/genders?includeInactive=${includeInactive}`);
+    return response.data;
+  },
+
+  // Get gender by ID
+  getGenderById: async (id: number): Promise<Gender> => {
+    const response = await api.get(`/genders/${id}`);
+    return response.data;
+  },
+
+  // Get gender by code
+  getGenderByCode: async (code: string): Promise<Gender> => {
+    const response = await api.get(`/genders/code/${code}`);
+    return response.data;
+  },
+
+  // Create gender
+  createGender: async (gender: Partial<Gender>): Promise<Gender> => {
+    const response = await api.post('/genders', gender);
+    return response.data;
+  },
+
+  // Update gender
+  updateGender: async (id: number, gender: Partial<Gender>): Promise<Gender> => {
+    const response = await api.put(`/genders/${id}`, gender);
+    return response.data;
+  },
+
+  // Soft delete gender
+  deleteGender: async (id: number): Promise<void> => {
+    await api.delete(`/genders/${id}`);
   },
 };
 

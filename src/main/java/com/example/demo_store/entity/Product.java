@@ -11,6 +11,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 
 @Entity
 @Table(name = "Products")
@@ -60,15 +61,29 @@ public class Product {
     private ProductStatus status = ProductStatus.ACTIVE;
     
     @ManyToOne(fetch = FetchType.EAGER)
-    @JoinColumn(name = "category_id", nullable = false)
+    @JoinColumn(name = "gender_id", nullable = true)
     @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
-    @NotNull(message = "Category is required")
+    private Gender gender;
+    
+    // Many-to-many relationship with Categories
+    @ManyToMany(fetch = FetchType.EAGER, cascade = {CascadeType.PERSIST, CascadeType.MERGE})
+    @JoinTable(
+        name = "ProductCategories",
+        joinColumns = @JoinColumn(name = "product_id"),
+        inverseJoinColumns = @JoinColumn(name = "category_id")
+    )
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
+    private Set<Category> categories;
+    
+    // Keep the old single category for backward compatibility (optional)
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "category_id", nullable = true)
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private Category category;
     
     @ManyToOne(fetch = FetchType.EAGER)
-    @JoinColumn(name = "brand_id", nullable = false)
+    @JoinColumn(name = "brand_id", nullable = true)
     @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
-    @NotNull(message = "Brand is required")
     private Brand brand;
     
     @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
@@ -86,4 +101,5 @@ public class Product {
     public enum ProductStatus {
         ACTIVE, INACTIVE, OUT_OF_STOCK, DISCONTINUED
     }
+    
 }

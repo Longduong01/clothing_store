@@ -15,6 +15,7 @@ import {
   Statistic,
   Tag,
   Tooltip,
+  Select,
 } from 'antd';
 import {
   PlusOutlined,
@@ -28,7 +29,7 @@ import {
 } from '@ant-design/icons';
 import { sizeApi } from '../../services/api';
 import { Size, CreateSizeRequest, UpdateSizeRequest } from '../../types';
-import { PAGINATION_CONFIG, VALIDATION_RULES } from '../../utils/constants';
+import { VALIDATION_RULES } from '../../utils/constants';
 import { useMutation } from '../../hooks/useApi';
 import { playSound } from '../../utils/sound';
 
@@ -37,9 +38,12 @@ const { Title, Text } = Typography;
 const SizeManagement: React.FC = () => {
   const [sizes, setSizes] = useState<Size[]>([]);
   const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [searchText, setSearchText] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('');
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [editingSize, setEditingSize] = useState<Size | null>(null);
+  const [showAllRecords, setShowAllRecords] = useState(true); // Mặc định hiển thị tất cả
   const [form] = Form.useForm();
 
 
@@ -47,7 +51,7 @@ const SizeManagement: React.FC = () => {
   const fetchSizes = async () => {
     setLoading(true);
     try {
-      const response = await sizeApi.getSizes();
+      const response = await sizeApi.getSizes(showAllRecords); // Sử dụng state để quyết định
       setSizes(response);
     } catch (error) {
       console.error('API Error:', error);
@@ -58,9 +62,28 @@ const SizeManagement: React.FC = () => {
     }
   };
 
+  const refreshSizes = async () => {
+    setRefreshing(true);
+    try {
+      const updatedSizes = await sizeApi.getSizes(showAllRecords);
+      setSizes(updatedSizes);
+      return updatedSizes;
+    } catch (e) {
+      console.error('Error refreshing sizes:', e);
+      return [];
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   useEffect(() => {
     fetchSizes();
   }, []);
+
+  // Fetch lại data khi toggle thay đổi
+  useEffect(() => {
+    fetchSizes();
+  }, [showAllRecords]);
 
   // Mutations
   const createSizeMutation = useMutation(sizeApi.createSize);
@@ -97,7 +120,7 @@ const SizeManagement: React.FC = () => {
             playSound('success');
             setIsModalVisible(false);
             form.resetFields();
-            fetchSizes();
+            await refreshSizes();
           }
         } catch (error) {
           console.error('Create Error:', error);
@@ -128,7 +151,7 @@ const SizeManagement: React.FC = () => {
             setIsModalVisible(false);
             setEditingSize(null);
             form.resetFields();
-            fetchSizes();
+            await refreshSizes();
           }
         } catch (error) {
           notification.error({ message: 'Lỗi', description: 'Cập nhật size thất bại' });
@@ -146,7 +169,7 @@ const SizeManagement: React.FC = () => {
       // Optimistic update
       setSizes(prev => prev.filter(s => s.sizeId !== sizeId));
       // Background refresh to stay in sync
-      fetchSizes();
+      await refreshSizes();
     } catch (error) {
       notification.error({ message: 'Lỗi', description: 'Xóa size thất bại' });
       playSound('error');
@@ -171,6 +194,7 @@ const SizeManagement: React.FC = () => {
     setEditingSize(size);
     form.setFieldsValue({
       sizeName: size.sizeName,
+      status: size.status,
     });
     setIsModalVisible(true);
   };
@@ -212,7 +236,45 @@ const SizeManagement: React.FC = () => {
       ),
     },
     {
-      // Removed Created At column
+      title: 'Trạng thái',
+      dataIndex: 'status',
+      key: 'status',
+      width: 100,
+      render: (status: string) => {
+        const color = status === 'ACTIVE' ? '#f6ffed' : status === 'INACTIVE' ? '#fff1f0' : status === 'DISCONTINUED' ? '#f0f0f0' : '#fff7e6';
+        const textColor = status === 'ACTIVE' ? '#389e0d' : status === 'INACTIVE' ? '#cf1322' : status === 'DISCONTINUED' ? '#595959' : '#d46b08';
+        const label = status === 'ACTIVE' ? 'Hoạt động' : status === 'INACTIVE' ? 'Ngừng hoạt động' : status === 'DISCONTINUED' ? 'Ngừng sản xuất' : 'Không xác định';
+        
+        return (
+          <Tag color={color} style={{ color: textColor, border: '1px solid #d9d9d9' }}>
+            {label}
+          </Tag>
+        );
+      }
+    },
+    {
+      title: 'Đang được sử dụng',
+      dataIndex: 'productCount',
+      key: 'productCount',
+      width: 120,
+      sorter: (a: Size, b: Size) => a.productCount - b.productCount,
+      render: (count: number) => (
+        <Tag
+          color={count > 0 ? '#52c41a' : '#d9d9d9'}
+          style={{
+            color: count > 0 ? '#ffffff' : '#8c8c8c',
+            fontSize: 14,
+            padding: '4px 12px',
+            borderRadius: 8,
+            border: count > 0 ? '1px solid #52c41a' : '1px solid #d9d9d9',
+            minWidth: 60,
+            textAlign: 'center',
+            fontWeight: 600
+          }}
+        >
+          {count} biến thể
+        </Tag>
+      )
     },
     {
       title: 'Thao tác',
@@ -240,9 +302,11 @@ const SizeManagement: React.FC = () => {
     },
   ];
 
-  const filteredSizes = sizes.filter(size =>
-    !searchText || size.sizeName.toLowerCase().includes(searchText.toLowerCase())
-  );
+  const filteredSizes = sizes.filter(size => {
+    const matchesSearch = !searchText || size.sizeName.toLowerCase().includes(searchText.toLowerCase());
+    const matchesStatus = !statusFilter || size.status === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
 
   return (
     <div>
@@ -260,10 +324,20 @@ const SizeManagement: React.FC = () => {
         <Col span={8}>
           <Card>
             <Statistic
-              title="Đang dùng"
-              value={sizes.length}
+              title="Đang hoạt động"
+              value={sizes.filter(s => s.status === 'ACTIVE').length}
               prefix={<TagsOutlined />}
               valueStyle={{ color: '#52c41a' }}
+            />
+          </Card>
+        </Col>
+        <Col span={8}>
+          <Card>
+            <Statistic
+              title="Ngừng hoạt động"
+              value={sizes.filter(s => s.status === 'INACTIVE').length}
+              prefix={<TagsOutlined />}
+              valueStyle={{ color: '#ff4d4f' }}
             />
           </Card>
         </Col>
@@ -299,10 +373,33 @@ const SizeManagement: React.FC = () => {
                   onChange={(e) => setSearchText(e.target.value)}
                   style={{ width: 200 }}
                 />
+                <Select
+                  placeholder="Trạng thái"
+                  allowClear
+                  showSearch
+                  filterOption={(input, option) =>
+                    String(option?.children || '').toLowerCase().includes(input.toLowerCase())
+                  }
+                  notFoundContent="Không tìm thấy"
+                  style={{ width: 150 }}
+                  value={statusFilter}
+                  onChange={setStatusFilter}
+                >
+                  <Select.Option value="ACTIVE">Hoạt động</Select.Option>
+                  <Select.Option value="INACTIVE">Ngừng hoạt động</Select.Option>
+                  <Select.Option value="DISCONTINUED">Ngừng sản xuất</Select.Option>
+                </Select>
+                <Button
+                  type={showAllRecords ? "default" : "primary"}
+                  onClick={() => setShowAllRecords(!showAllRecords)}
+                  style={{ minWidth: 120 }}
+                >
+                  {showAllRecords ? "Chỉ hiển thị hoạt động" : "Hiển thị tất cả"}
+                </Button>
                 <Button
                   icon={<ReloadOutlined />}
                   onClick={fetchSizes}
-                  loading={loading}
+                  loading={loading || refreshing}
                 >
                   Làm mới
                 </Button>
@@ -325,12 +422,14 @@ const SizeManagement: React.FC = () => {
           columns={columns}
           dataSource={filteredSizes}
           rowKey="sizeId"
-          loading={loading}
+          loading={loading || refreshing}
           pagination={{
-            ...PAGINATION_CONFIG,
-            total: filteredSizes.length,
-            showTotal: (total, range) =>
-              `${range[0]}-${range[1]} of ${total} sizes`,
+            pageSize: 10,
+            showSizeChanger: true,
+            showQuickJumper: true,
+            showTotal: (total, range) => `${range[0]}-${range[1]} của ${total} kích thước`,
+            pageSizeOptions: ['5', '10', '20', '50', '100'],
+            size: 'default'
           }}
           scroll={{ x: 600 }}
         />
@@ -379,6 +478,20 @@ const SizeManagement: React.FC = () => {
               }}
             />
           </Form.Item>
+
+          {editingSize && (
+            <Form.Item
+              name="status"
+              label="Trạng thái"
+              rules={[{ required: true, message: 'Vui lòng chọn trạng thái' }]}
+            >
+              <Select placeholder="Chọn trạng thái">
+                <Select.Option value="ACTIVE">Hoạt động</Select.Option>
+                <Select.Option value="INACTIVE">Ngừng hoạt động</Select.Option>
+                <Select.Option value="DISCONTINUED">Ngừng sản xuất</Select.Option>
+              </Select>
+            </Form.Item>
+          )}
 
           <Form.Item style={{ marginBottom: 0, textAlign: 'right' }}>
             <Space>

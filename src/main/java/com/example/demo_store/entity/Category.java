@@ -31,6 +31,13 @@ public class Category {
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;
     
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false, length = 20)
+    private CategoryStatus status = CategoryStatus.ACTIVE;
+    
+    @Column(name = "product_count", nullable = false)
+    private Integer productCount = 0;
+    
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "parent_id")
     @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
@@ -49,4 +56,8 @@ public class Category {
     @UpdateTimestamp
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+    
+    public enum CategoryStatus {
+        ACTIVE, INACTIVE, DISCONTINUED
+    }
 }

@@ -30,8 +30,13 @@ public class Brand {
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;
     
-    @Column(name = "website", length = 200)
-    private String website;
+    
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false, length = 20)
+    private BrandStatus status = BrandStatus.ACTIVE;
+    
+    @Column(name = "product_count", nullable = false)
+    private Integer productCount = 0;
     
     // @OneToMany(mappedBy = "brand", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     // private List<Product> products;
@@ -43,4 +48,8 @@ public class Brand {
     @UpdateTimestamp
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+    
+    public enum BrandStatus {
+        ACTIVE, INACTIVE, DISCONTINUED
+    }
 }

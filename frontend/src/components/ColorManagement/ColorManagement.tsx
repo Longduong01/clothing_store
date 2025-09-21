@@ -16,6 +16,7 @@ import {
   Tooltip,
   ColorPicker,
   Tag,
+  Select,
 } from 'antd';
 import {
   PlusOutlined,
@@ -29,7 +30,7 @@ import {
 } from '@ant-design/icons';
 import { colorApi } from '../../services/api.ts';
 import { Color, CreateColorRequest, UpdateColorRequest } from '../../types';
-import { PAGINATION_CONFIG, VALIDATION_RULES, COMMON_COLORS } from '../../utils/constants.ts';
+import { VALIDATION_RULES, COMMON_COLORS } from '../../utils/constants.ts';
 import { useMutation } from '../../hooks/useApi.ts';
 import { playSound } from '../../utils/sound.ts';
 
@@ -38,10 +39,13 @@ const { Title, Text } = Typography;
 const ColorManagement: React.FC = () => {
   const [colors, setColors] = useState<Color[]>([]);
   const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [searchText, setSearchText] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('');
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [editingColor, setEditingColor] = useState<Color | null>(null);
   const [selectedColor, setSelectedColor] = useState('#1890ff');
+  const [showAllRecords, setShowAllRecords] = useState(true); // Mặc định hiển thị tất cả
   const [form] = Form.useForm();
 
 
@@ -49,20 +53,39 @@ const ColorManagement: React.FC = () => {
   const fetchColors = async () => {
     setLoading(true);
     try {
-      const response = await colorApi.getColors();
+      const response = await colorApi.getColors(showAllRecords); // Sử dụng state để quyết định
       setColors(response);
     } catch (error) {
       console.error('API Error:', error);
-      message.error('Failed to fetch colors from database');
+      message.error('Không thể tải dữ liệu màu sắc từ cơ sở dữ liệu');
       setColors([]); // Show empty state when API fails
     } finally {
       setLoading(false);
     }
   };
 
+  const refreshColors = async () => {
+    setRefreshing(true);
+    try {
+      const updatedColors = await colorApi.getColors(showAllRecords);
+      setColors(updatedColors);
+      return updatedColors;
+    } catch (e) {
+      console.error('Error refreshing colors:', e);
+      return [];
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   useEffect(() => {
     fetchColors();
   }, []);
+
+  // Fetch lại data khi toggle thay đổi
+  useEffect(() => {
+    fetchColors();
+  }, [showAllRecords]);
 
   // Mutations
   const createColorMutation = useMutation(colorApi.createColor);
@@ -100,7 +123,7 @@ const ColorManagement: React.FC = () => {
             setIsModalVisible(false);
             form.resetFields();
             setSelectedColor('#1890ff');
-            fetchColors();
+            await refreshColors();
           }
         } catch (error) {
           notification.error({ message: 'Lỗi', description: 'Tạo màu thất bại' });
@@ -131,7 +154,7 @@ const ColorManagement: React.FC = () => {
             setEditingColor(null);
             form.resetFields();
             setSelectedColor('#1890ff');
-            fetchColors();
+            await refreshColors();
           }
         } catch (error) {
           notification.error({ message: 'Lỗi', description: 'Cập nhật màu thất bại' });
@@ -149,7 +172,7 @@ const ColorManagement: React.FC = () => {
       // Optimistic update
       setColors(prev => prev.filter(c => c.colorId !== colorId));
       // Background refresh to stay in sync
-      fetchColors();
+      await refreshColors();
     } catch (error) {
       notification.error({ message: 'Lỗi', description: 'Xóa màu thất bại' });
       playSound('error');
@@ -158,11 +181,11 @@ const ColorManagement: React.FC = () => {
 
   const confirmDeleteColor = (record: Color) => {
     Modal.confirm({
-      title: <span style={{ fontSize: 20, fontWeight: 700 }}>Confirm delete</span>,
+      title: <span style={{ fontSize: 20, fontWeight: 700 }}>Xác nhận xóa màu</span>,
       icon: <ExclamationCircleOutlined />,
-      content: <div style={{ fontSize: 18 }}>Delete color "{record.colorName}" (ID: {record.colorId})?</div>,
-      okText: 'Delete',
-      cancelText: 'Cancel',
+      content: <div style={{ fontSize: 18 }}>Xóa màu "{record.colorName}" (ID: {record.colorId})?</div>,
+      okText: 'Xóa',
+      cancelText: 'Hủy',
       okButtonProps: { danger: true, size: 'large' },
       cancelButtonProps: { size: 'large' },
       centered: true,
@@ -174,6 +197,7 @@ const ColorManagement: React.FC = () => {
     setEditingColor(color);
     form.setFieldsValue({
       colorName: color.colorName,
+      status: color.status,
     });
     setIsModalVisible(true);
   };
@@ -185,22 +209,6 @@ const ColorManagement: React.FC = () => {
     setSelectedColor('#1890ff');
   };
 
-  // Convert color name to hex (simplified mapping)
-  const getColorHex = (colorName: string): string => {
-    const colorMap: Record<string, string> = {
-      'red': '#ff0000',
-      'blue': '#0000ff',
-      'green': '#00ff00',
-      'yellow': '#ffff00',
-      'black': '#000000',
-      'white': '#ffffff',
-      'gray': '#808080',
-      'pink': '#ffc0cb',
-      'orange': '#ffa500',
-      'purple': '#800080',
-    };
-    return colorMap[colorName.toLowerCase()] || '#1890ff';
-  };
 
   const columns = [
     {
@@ -233,31 +241,48 @@ const ColorManagement: React.FC = () => {
       ),
     },
     {
-      title: 'Preview',
-      key: 'preview',
+      title: 'Trạng thái',
+      dataIndex: 'status',
+      key: 'status',
+      width: 100,
+      render: (status: string) => {
+        const color = status === 'ACTIVE' ? '#f6ffed' : status === 'INACTIVE' ? '#fff1f0' : status === 'DISCONTINUED' ? '#f0f0f0' : '#fff7e6';
+        const textColor = status === 'ACTIVE' ? '#389e0d' : status === 'INACTIVE' ? '#cf1322' : status === 'DISCONTINUED' ? '#595959' : '#d46b08';
+        const label = status === 'ACTIVE' ? 'Hoạt động' : status === 'INACTIVE' ? 'Ngừng hoạt động' : status === 'DISCONTINUED' ? 'Ngừng sản xuất' : 'Không xác định';
+        
+        return (
+          <Tag color={color} style={{ color: textColor, border: '1px solid #d9d9d9' }}>
+            {label}
+          </Tag>
+        );
+      }
+    },
+    {
+      title: 'Đang được sử dụng',
+      dataIndex: 'productCount',
+      key: 'productCount',
       width: 120,
-      render: (_: any, record: Color) => (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div
-            style={{
-              width: 24,
-              height: 24,
-              backgroundColor: getColorHex(record.colorName),
-              border: '1px solid #d9d9d9',
-              borderRadius: 4,
-            }}
-          />
-          <Text type="secondary" style={{ fontSize: '12px' }}>
-            {getColorHex(record.colorName)}
-          </Text>
-        </div>
-      ),
+      sorter: (a: Color, b: Color) => a.productCount - b.productCount,
+      render: (count: number) => (
+        <Tag
+          color={count > 0 ? '#52c41a' : '#d9d9d9'}
+          style={{
+            color: count > 0 ? '#ffffff' : '#8c8c8c',
+            fontSize: 14,
+            padding: '4px 12px',
+            borderRadius: 8,
+            border: count > 0 ? '1px solid #52c41a' : '1px solid #d9d9d9',
+            minWidth: 60,
+            textAlign: 'center',
+            fontWeight: 600
+          }}
+        >
+          {count} biến thể
+        </Tag>
+      )
     },
     {
-      // Removed Created At column
-    },
-    {
-      title: 'Actions',
+      title: 'Thao tác',
       key: 'actions',
       width: 120,
       render: (_: any, record: Color) => (
@@ -282,9 +307,11 @@ const ColorManagement: React.FC = () => {
     },
   ];
 
-  const filteredColors = colors.filter(color =>
-    !searchText || color.colorName.toLowerCase().includes(searchText.toLowerCase())
-  );
+  const filteredColors = colors.filter(color => {
+    const matchesSearch = !searchText || color.colorName.toLowerCase().includes(searchText.toLowerCase());
+    const matchesStatus = !statusFilter || color.status === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
 
   return (
     <div>
@@ -292,7 +319,7 @@ const ColorManagement: React.FC = () => {
         <Col span={8}>
           <Card>
             <Statistic
-              title="Total Colors"
+              title="Tổng số màu"
               value={colors.length}
               prefix={<BgColorsOutlined />}
               valueStyle={{ color: '#1890ff' }}
@@ -302,8 +329,8 @@ const ColorManagement: React.FC = () => {
         <Col span={8}>
           <Card>
             <Statistic
-              title="Active Colors"
-              value={colors.length}
+              title="Đang hoạt động"
+              value={colors.filter(c => c.status === 'ACTIVE').length}
               prefix={<BgColorsOutlined />}
               valueStyle={{ color: '#52c41a' }}
             />
@@ -312,10 +339,10 @@ const ColorManagement: React.FC = () => {
         <Col span={8}>
           <Card>
             <Statistic
-              title="Most Popular"
-              value="Black"
+              title="Ngừng hoạt động"
+              value={colors.filter(c => c.status === 'INACTIVE').length}
               prefix={<BgColorsOutlined />}
-              valueStyle={{ color: '#722ed1' }}
+              valueStyle={{ color: '#ff4d4f' }}
             />
           </Card>
         </Col>
@@ -341,10 +368,33 @@ const ColorManagement: React.FC = () => {
                   onChange={(e) => setSearchText(e.target.value)}
                   style={{ width: 200 }}
                 />
+                <Select
+                  placeholder="Trạng thái"
+                  allowClear
+                  showSearch
+                  filterOption={(input, option) =>
+                    String(option?.children || '').toLowerCase().includes(input.toLowerCase())
+                  }
+                  notFoundContent="Không tìm thấy"
+                  style={{ width: 150 }}
+                  value={statusFilter}
+                  onChange={setStatusFilter}
+                >
+                  <Select.Option value="ACTIVE">Hoạt động</Select.Option>
+                  <Select.Option value="INACTIVE">Ngừng hoạt động</Select.Option>
+                  <Select.Option value="DISCONTINUED">Ngừng sản xuất</Select.Option>
+                </Select>
+                <Button
+                  type={showAllRecords ? "default" : "primary"}
+                  onClick={() => setShowAllRecords(!showAllRecords)}
+                  style={{ minWidth: 120 }}
+                >
+                  {showAllRecords ? "Chỉ hiển thị hoạt động" : "Hiển thị tất cả"}
+                </Button>
                 <Button
                   icon={<ReloadOutlined />}
                   onClick={fetchColors}
-                  loading={loading}
+                  loading={loading || refreshing}
                 >
                   Làm mới
                 </Button>
@@ -367,12 +417,14 @@ const ColorManagement: React.FC = () => {
           columns={columns}
           dataSource={filteredColors}
           rowKey="colorId"
-          loading={loading}
+          loading={loading || refreshing}
           pagination={{
-            ...PAGINATION_CONFIG,
-            total: filteredColors.length,
-            showTotal: (total, range) =>
-              `${range[0]}-${range[1]} of ${total} colors`,
+            pageSize: 10,
+            showSizeChanger: true,
+            showQuickJumper: true,
+            showTotal: (total, range) => `${range[0]}-${range[1]} của ${total} màu sắc`,
+            pageSizeOptions: ['5', '10', '20', '50', '100'],
+            size: 'default'
           }}
           scroll={{ x: 700 }}
         />
@@ -422,14 +474,14 @@ const ColorManagement: React.FC = () => {
             />
           </Form.Item>
 
-          <Form.Item label="Color Preview">
+          <Form.Item label="Xem trước màu">
             <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
               <ColorPicker
                 value={selectedColor}
                 onChange={(color) => setSelectedColor(color.toHexString())}
                 presets={[
                   {
-                    label: 'Common Colors',
+                    label: 'Màu thông dụng',
                     colors: COMMON_COLORS,
                   },
                 ]}
@@ -446,6 +498,20 @@ const ColorManagement: React.FC = () => {
               <Text type="secondary">{selectedColor}</Text>
             </div>
           </Form.Item>
+
+          {editingColor && (
+            <Form.Item
+              name="status"
+              label="Trạng thái"
+              rules={[{ required: true, message: 'Vui lòng chọn trạng thái' }]}
+            >
+              <Select placeholder="Chọn trạng thái">
+                <Select.Option value="ACTIVE">Hoạt động</Select.Option>
+                <Select.Option value="INACTIVE">Ngừng hoạt động</Select.Option>
+                <Select.Option value="DISCONTINUED">Ngừng sản xuất</Select.Option>
+              </Select>
+            </Form.Item>
+          )}
 
           <Form.Item style={{ marginBottom: 0, textAlign: 'right' }}>
             <Space>

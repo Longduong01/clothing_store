@@ -1,6 +1,7 @@
 package com.example.demo_store.controller;
 
 import com.example.demo_store.entity.Size;
+import com.example.demo_store.entity.Size.SizeStatus;
 import com.example.demo_store.repository.SizeRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -10,7 +11,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Map;
 import java.util.HashMap;
-import java.util.ArrayList;
 
 @RestController
 @RequestMapping("/api/sizes")
@@ -19,11 +19,16 @@ public class SizeController {
     @Autowired
     private SizeRepository sizeRepository;
 
-    // GET /api/sizes - Lấy tất cả kích thước
+    // GET /api/sizes - Lấy tất cả kích thước (mặc định chỉ ACTIVE, có thể includeInactive)
     @GetMapping
-    public ResponseEntity<List<Size>> getAllSizes() {
+    public ResponseEntity<List<Size>> getAllSizes(@RequestParam(defaultValue = "false") boolean includeInactive) {
         try {
-            List<Size> sizes = sizeRepository.findAll();
+            List<Size> sizes;
+            if (includeInactive) {
+                sizes = sizeRepository.findAll();
+            } else {
+                sizes = sizeRepository.findByStatus(Size.SizeStatus.ACTIVE);
+            }
             return ResponseEntity.ok(sizes);
         } catch (Exception e) {
             e.printStackTrace();
@@ -84,6 +89,11 @@ public class SizeController {
             Size size = sizeOptional.get();
             size.setSizeName(request.getSizeName());
             
+            // Update status if provided
+            if (request.getStatus() != null) {
+                size.setStatus(SizeStatus.valueOf(request.getStatus()));
+            }
+            
             Size updatedSize = sizeRepository.save(size);
             return ResponseEntity.ok(updatedSize);
         } catch (Exception e) {
@@ -91,18 +101,21 @@ public class SizeController {
         }
     }
 
-    // DELETE /api/sizes/{id} - Xóa kích thước
+    // DELETE /api/sizes/{id} - Soft delete size (set status to INACTIVE)
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteSize(@PathVariable Long id) {
         try {
-            if (!sizeRepository.existsById(id)) {
+            Optional<Size> sizeOptional = sizeRepository.findById(id);
+            if (sizeOptional.isPresent()) {
+                Size size = sizeOptional.get();
+                size.setStatus(Size.SizeStatus.INACTIVE);
+                sizeRepository.save(size);
+                return ResponseEntity.ok(new SuccessResponse("Size deactivated successfully"));
+            } else {
                 return ResponseEntity.notFound().build();
             }
-
-            sizeRepository.deleteById(id);
-            return ResponseEntity.ok(new SuccessResponse("Size deleted successfully"));
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(new ErrorResponse("Failed to delete size: " + e.getMessage()));
+            return ResponseEntity.badRequest().body(new ErrorResponse("Failed to deactivate size: " + e.getMessage()));
         }
     }
 
@@ -149,8 +162,12 @@ public class SizeController {
 
     public static class SizeUpdateRequest {
         private String sizeName;
+        private String status;
 
         public String getSizeName() { return sizeName; }
         public void setSizeName(String sizeName) { this.sizeName = sizeName; }
+        
+        public String getStatus() { return status; }
+        public void setStatus(String status) { this.status = status; }
     }
 }

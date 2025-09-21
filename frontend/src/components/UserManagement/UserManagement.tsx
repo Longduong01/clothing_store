@@ -29,8 +29,8 @@ import {
   ExclamationCircleOutlined,
 } from '@ant-design/icons';
 import { userApi } from '../../services/api';
-import { User, CreateUserRequest, UpdateUserRequest, UserRole } from '../../types';
-import { PAGINATION_CONFIG, VALIDATION_RULES, USER_ROLES } from '../../utils/constants';
+import { User, CreateUserRequest, UpdateUserRequest, UserRole } from '../../types/user';
+import { VALIDATION_RULES, USER_ROLES } from '../../utils/constants';
 import { useMutation } from '../../hooks/useApi';
 import dayjs from 'dayjs';
 import { playSound } from '../../utils/sound';
@@ -45,6 +45,7 @@ const UserManagement: React.FC = () => {
   const [roleFilter, setRoleFilter] = useState<string>('');
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [showAllRecords, setShowAllRecords] = useState(true); // Mặc định hiển thị tất cả
   const [form] = Form.useForm();
 
   // Mock data for testing
@@ -54,7 +55,7 @@ const UserManagement: React.FC = () => {
     setLoading(true);
     try {
       // Use real API
-      const response = await userApi.getUsers();
+      const response = await userApi.getUsers({}, showAllRecords); // Sử dụng state để quyết định
       setUsers(response);
     } catch (error) {
       message.error('Failed to fetch users');
@@ -67,6 +68,11 @@ const UserManagement: React.FC = () => {
   useEffect(() => {
     fetchUsers();
   }, [searchText, roleFilter]);
+
+  // Fetch lại data khi toggle thay đổi
+  useEffect(() => {
+    fetchUsers();
+  }, [showAllRecords]);
 
   // Create user mutation
   const createUserMutation = useMutation(userApi.createUser);
@@ -266,6 +272,23 @@ const UserManagement: React.FC = () => {
       ),
     },
     {
+      title: 'Trạng thái',
+      dataIndex: 'status',
+      key: 'status',
+      width: 100,
+      render: (status: string) => {
+        const color = status === 'ACTIVE' ? '#f6ffed' : status === 'INACTIVE' ? '#fff1f0' : status === 'SUSPENDED' ? '#fff7e6' : '#f0f0f0';
+        const textColor = status === 'ACTIVE' ? '#389e0d' : status === 'INACTIVE' ? '#cf1322' : status === 'SUSPENDED' ? '#d46b08' : '#595959';
+        const label = status === 'ACTIVE' ? 'Hoạt động' : status === 'INACTIVE' ? 'Ngừng hoạt động' : status === 'SUSPENDED' ? 'Tạm khóa' : 'Không xác định';
+        
+        return (
+          <Tag color={color} style={{ color: textColor, border: '1px solid #d9d9d9' }}>
+            {label}
+          </Tag>
+        );
+      }
+    },
+    {
       title: 'Ngày tạo',
       dataIndex: 'createdAt',
       key: 'createdAt',
@@ -382,6 +405,13 @@ const UserManagement: React.FC = () => {
                   <Option value={UserRole.CUSTOMER}>Customer</Option>
                 </Select>
                 <Button
+                  type={showAllRecords ? "default" : "primary"}
+                  onClick={() => setShowAllRecords(!showAllRecords)}
+                  style={{ minWidth: 120 }}
+                >
+                  {showAllRecords ? "Chỉ hiển thị hoạt động" : "Hiển thị tất cả"}
+                </Button>
+                <Button
                   icon={<ReloadOutlined />}
                   onClick={fetchUsers}
                   loading={loading}
@@ -409,10 +439,12 @@ const UserManagement: React.FC = () => {
           rowKey="userId"
           loading={loading}
           pagination={{
-            ...PAGINATION_CONFIG,
-            total: filteredUsers.length,
-            showTotal: (total, range) =>
-              `${range[0]}-${range[1]} of ${total} users`,
+            pageSize: 10,
+            showSizeChanger: true,
+            showQuickJumper: true,
+            showTotal: (total, range) => `${range[0]}-${range[1]} của ${total} người dùng`,
+            pageSizeOptions: ['5', '10', '20', '50', '100'],
+            size: 'default'
           }}
           scroll={{ x: 800 }}
         />
