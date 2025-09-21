@@ -4,6 +4,7 @@ import com.example.demo_store.entity.Product;
 import com.example.demo_store.entity.Category;
 import com.example.demo_store.entity.Brand;
 import com.example.demo_store.entity.ProductImage;
+import com.example.demo_store.dto.ProductDTO;
 import com.example.demo_store.dto.ProductUpdateRequest;
 import com.example.demo_store.repository.ProductRepository;
 import com.example.demo_store.repository.CategoryRepository;
@@ -40,12 +41,45 @@ public class ProductController {
     @Autowired
     private ProductImageService productImageService;
     
+    @Autowired
+    private com.example.demo_store.repository.ProductVariantRepository productVariantRepository;
+    
+    // Tính tổng tồn kho từ các variants của sản phẩm
+    private Integer calculateTotalStock(Long productId) {
+        try {
+            List<com.example.demo_store.entity.ProductVariant> variants = 
+                productVariantRepository.findByProductProductId(productId);
+            return variants.stream()
+                .mapToInt(com.example.demo_store.entity.ProductVariant::getStock)
+                .sum();
+        } catch (Exception e) {
+            e.printStackTrace();
+            return 0;
+        }
+    }
+    
     // GET /api/products - Lấy tất cả products (trả về DTO gọn tránh lỗi serialize)
     @GetMapping
-    public ResponseEntity<List<ProductDto>> getAllProducts() {
+    public ResponseEntity<List<ProductDTO>> getAllProducts(
+            @RequestParam(value = "includeInactive", defaultValue = "false") boolean includeInactive) {
         try {
-            List<Product> products = productRepository.findAll();
-            List<ProductDto> dtos = products.stream().map(ProductDto::fromEntity).toList();
+            List<Product> products;
+            if (includeInactive) {
+                // Lấy tất cả sản phẩm (bao gồm cả inactive)
+                products = productRepository.findAll();
+            } else {
+                // Chỉ lấy sản phẩm active
+                products = productRepository.findByStatus(Product.ProductStatus.ACTIVE);
+            }
+            
+            List<ProductDTO> dtos = products.stream()
+                .map(product -> {
+                    ProductDTO dto = ProductDTO.fromEntity(product);
+                    // Tính tổng tồn kho từ variants
+                    dto.setTotalStock(calculateTotalStock(product.getProductId()));
+                    return dto;
+                })
+                .toList();
             return ResponseEntity.ok(dtos);
         } catch (Exception e) {
             e.printStackTrace();
@@ -55,12 +89,19 @@ public class ProductController {
     
     // GET /api/products/{id} - Lấy product theo ID
     @GetMapping("/{id}")
-    public ResponseEntity<Product> getProductById(@PathVariable Long id) {
+    public ResponseEntity<ProductDTO> getProductById(@PathVariable Long id) {
         try {
             Optional<Product> product = productRepository.findById(id);
-            return product.map(ResponseEntity::ok)
-                        .orElse(ResponseEntity.notFound().build());
+            if (product.isPresent()) {
+                ProductDTO dto = ProductDTO.fromEntity(product.get());
+                // Tính tổng tồn kho từ variants
+                dto.setTotalStock(calculateTotalStock(id));
+                return ResponseEntity.ok(dto);
+            } else {
+                return ResponseEntity.notFound().build();
+            }
         } catch (Exception e) {
+            e.printStackTrace();
             return ResponseEntity.status(500).build();
         }
     }
@@ -231,17 +272,22 @@ public class ProductController {
         }
     }
     
-    // DELETE /api/products/{id} - Xóa product
+    // DELETE /api/products/{id} - Soft delete product (chuyển status thành INACTIVE)
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteProduct(@PathVariable Long id) {
         try {
-            if (productRepository.existsById(id)) {
-                productRepository.deleteById(id);
+            Optional<Product> productOptional = productRepository.findById(id);
+            if (productOptional.isPresent()) {
+                Product product = productOptional.get();
+                // Soft delete: chuyển status thành INACTIVE thay vì xóa hẳn
+                product.setStatus(Product.ProductStatus.INACTIVE);
+                productRepository.save(product);
                 return ResponseEntity.ok().build();
             } else {
                 return ResponseEntity.notFound().build();
             }
         } catch (Exception e) {
+            e.printStackTrace();
             return ResponseEntity.status(500).build();
         }
     }
@@ -342,6 +388,27 @@ public class ProductController {
             List<ProductImage> images = productImageService.getProductImages(id);
             return ResponseEntity.ok(images);
         } catch (Exception e) {
+            return ResponseEntity.status(500).build();
+        }
+    }
+    
+    // POST /api/products/{id}/images - Upload ảnh cho sản phẩm
+    @PostMapping(value = "/{id}/images", consumes = "multipart/form-data")
+    public ResponseEntity<List<ProductImage>> uploadProductImages(
+            @PathVariable Long id,
+            @RequestParam("images") List<MultipartFile> images) {
+        try {
+            // Kiểm tra product tồn tại
+            Optional<Product> product = productRepository.findById(id);
+            if (!product.isPresent()) {
+                return ResponseEntity.notFound().build();
+            }
+            
+            List<ProductImage> uploadedImages = productImageService.uploadProductImages(id, images.toArray(new MultipartFile[0]));
+            
+            return ResponseEntity.ok(uploadedImages);
+        } catch (Exception e) {
+            e.printStackTrace();
             return ResponseEntity.status(500).build();
         }
     }

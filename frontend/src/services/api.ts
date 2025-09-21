@@ -16,6 +16,7 @@ import {
   ProductVariant,
   CreateVariantRequest,
   UpdateVariantRequest,
+  BulkVariantCreateRequest,
   FilterOptions
 } from '../types';
 
@@ -268,8 +269,8 @@ export const categoryApi = {
 
 // Product API
 export const productApi = {
-  getProducts: async (): Promise<Product[]> => {
-    const response = await api.get('/products');
+  getProducts: async (includeInactive: boolean = false): Promise<Product[]> => {
+    const response = await api.get(`/products?includeInactive=${includeInactive}`);
     return response.data;
   },
   getProductById: async (id: number): Promise<Product> => {
@@ -355,6 +356,24 @@ export const variantApi = {
     const response = await api.post('/variants/update-product-statuses');
     return response.data;
   },
+
+  // Create multiple variants at once
+  createBulkVariants: async (data: BulkVariantCreateRequest): Promise<ProductVariant[]> => {
+    const response = await api.post('/variants/bulk', data);
+    return response.data;
+  },
+
+  // Upload image for variant
+  uploadVariantImage: async (variantId: number, image: File): Promise<ProductVariant> => {
+    const formData = new FormData();
+    formData.append('image', image);
+    const response = await api.post(`/variants/${variantId}/images`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
 };
 
 // Test API
@@ -368,6 +387,20 @@ export const testApi = {
   // Get all users for testing
   getTestUsers: async (): Promise<User[]> => {
     const response = await api.get('/test/users');
+    return response.data;
+  },
+
+  // Upload images for product
+  uploadProductImages: async (productId: number, images: File[]): Promise<any[]> => {
+    const formData = new FormData();
+    images.forEach(image => {
+      formData.append('images', image);
+    });
+    const response = await api.post(`/products/${productId}/images`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
     return response.data;
   },
 };

@@ -21,6 +21,11 @@ public class ProductDTO {
     private String status;
     private String categoryName;
     private String brandName;
+    private Integer totalStock; // Tổng tồn kho từ variants
+    
+    // Nested objects for frontend compatibility
+    private CategoryRef category;
+    private BrandRef brand;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     
@@ -38,9 +43,52 @@ public class ProductDTO {
         dto.setStatus(product.getStatus().toString());
         dto.setCategoryName(product.getCategory() != null ? product.getCategory().getCategoryName() : null);
         dto.setBrandName(product.getBrand() != null ? product.getBrand().getBrandName() : null);
+        
+        // Set nested objects for frontend compatibility
+        if (product.getCategory() != null) {
+            CategoryRef categoryRef = new CategoryRef();
+            categoryRef.setCategoryId(product.getCategory().getCategoryId());
+            categoryRef.setCategoryName(product.getCategory().getCategoryName());
+            categoryRef.setImageUrl(product.getCategory().getImageUrl());
+            categoryRef.setDescription(product.getCategory().getDescription());
+            dto.setCategory(categoryRef);
+        }
+        
+        if (product.getBrand() != null) {
+            BrandRef brandRef = new BrandRef();
+            brandRef.setBrandId(product.getBrand().getBrandId());
+            brandRef.setBrandName(product.getBrand().getBrandName());
+            brandRef.setLogoUrl(product.getBrand().getLogoUrl());
+            brandRef.setDescription(product.getBrand().getDescription());
+            brandRef.setWebsite(product.getBrand().getWebsite());
+            dto.setBrand(brandRef);
+        }
+        
         dto.setCreatedAt(product.getCreatedAt());
         dto.setUpdatedAt(product.getUpdatedAt());
         
         return dto;
+    }
+    
+    // Inner classes for nested objects
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class CategoryRef {
+        private Long categoryId;
+        private String categoryName;
+        private String imageUrl;
+        private String description;
+    }
+    
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class BrandRef {
+        private Long brandId;
+        private String brandName;
+        private String logoUrl;
+        private String description;
+        private String website;
     }
 }

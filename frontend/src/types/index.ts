@@ -71,9 +71,12 @@ export interface Product extends BaseEntity {
   imageUrl?: string;
   thumbnailUrl?: string;
   stockQuantity?: number; // Optional for parent products
+  totalStock?: number; // Tổng tồn kho từ variants
   status: ProductStatus;
-  category: Category;
-  brand: Brand;
+  categoryName?: string;
+  brandName?: string;
+  category?: Category; // Optional for backward compatibility
+  brand?: Brand; // Optional for backward compatibility
 }
 
 // Product Variant types
@@ -117,6 +120,19 @@ export interface UpdateVariantRequest {
   price: number;
   stock: number;
   status: VariantStatus;
+}
+
+export interface BulkVariantItem {
+  sizeId: number;
+  colorId: number;
+  price: number;
+  stock: number;
+  status: VariantStatus;
+}
+
+export interface BulkVariantCreateRequest {
+  productId: number;
+  variants: BulkVariantItem[];
 }
 
 export enum ProductStatus {
