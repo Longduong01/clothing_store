@@ -61,9 +61,6 @@ public class ProductVariant {
     @Column(name = "status", nullable = false, length = 20)
     private VariantStatus status = VariantStatus.ACTIVE;
     
-    @Column(name = "image_path", length = 500)
-    private String imagePath;
-    
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

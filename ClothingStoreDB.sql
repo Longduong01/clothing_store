@@ -64,9 +64,7 @@ CREATE TABLE Products (
     product_name NVARCHAR(200) NOT NULL,
     description NVARCHAR(MAX),
     sku NVARCHAR(50) NOT NULL UNIQUE,
-    image_url NVARCHAR(500),
     thumbnail_url NVARCHAR(500),
-    gallery_images NVARCHAR(MAX),
     stock_quantity INT NOT NULL DEFAULT 0,
     status NVARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
     category_id INT NULL,
@@ -95,10 +93,33 @@ CREATE TABLE Sizes (
 CREATE TABLE Colors (
     color_id INT IDENTITY(1,1) PRIMARY KEY,
     color_name NVARCHAR(50) NOT NULL UNIQUE,
+    color_code NVARCHAR(7), -- Hex color code (#FF0000)
     status NVARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
     created_at DATETIME2 DEFAULT GETDATE(),
     updated_at DATETIME2 DEFAULT GETDATE(),
     CONSTRAINT CHK_Colors_Status CHECK (status IN ('ACTIVE', 'INACTIVE', 'DISCONTINUED'))
+);
+
+-- Bảng Product Images (Gallery ảnh chung của sản phẩm)
+CREATE TABLE ProductImages (
+    image_id INT IDENTITY(1,1) PRIMARY KEY,
+    product_id INT NOT NULL,
+    image_url NVARCHAR(500) NOT NULL,
+    image_order INT NOT NULL DEFAULT 0,
+    is_primary BIT NOT NULL DEFAULT 0,
+    created_at DATETIME2 DEFAULT GETDATE(),
+    CONSTRAINT FK_ProductImages_Product FOREIGN KEY (product_id) REFERENCES Products(product_id) ON DELETE CASCADE
+);
+
+-- Bảng Color Images (Ảnh theo màu sắc)
+CREATE TABLE ColorImages (
+    image_id INT IDENTITY(1,1) PRIMARY KEY,
+    color_id INT NOT NULL,
+    image_url NVARCHAR(500) NOT NULL,
+    image_order INT NOT NULL DEFAULT 0,
+    is_primary BIT NOT NULL DEFAULT 0,
+    created_at DATETIME2 DEFAULT GETDATE(),
+    CONSTRAINT FK_ColorImages_Color FOREIGN KEY (color_id) REFERENCES Colors(color_id) ON DELETE CASCADE
 );
 
 -- Bảng Genders
@@ -144,7 +165,6 @@ CREATE TABLE ProductVariants (
     price DECIMAL(18,2) NOT NULL,
     stock INT NOT NULL DEFAULT 0,
     status NVARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
-    image_path NVARCHAR(500) NULL,
     created_at DATETIME2 DEFAULT GETDATE(),
     updated_at DATETIME2 DEFAULT GETDATE(),
     CONSTRAINT FK_ProductVariants_Product FOREIGN KEY (product_id) REFERENCES Products(product_id),

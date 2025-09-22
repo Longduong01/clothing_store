@@ -5,8 +5,6 @@ import {
   CreateUserRequest, 
   UpdateUserRequest,
   Product,
-  ProductCreateRequest,
-  ProductUpdateRequest,
   Size,
   CreateSizeRequest,
   UpdateSizeRequest,
@@ -20,16 +18,15 @@ import {
   CreateVariantRequest,
   UpdateVariantRequest,
   BulkVariantCreateRequest,
-  FilterOptions
+  FilterOptions,
+  ProductImage,
+  ColorImage
 } from '../types';
 
 // Create axios instance
 const api: AxiosInstance = axios.create({
   baseURL: '/api',
   timeout: 10000,
-  headers: {
-    'Content-Type': 'application/json',
-  },
 });
 
 // Request interceptor
@@ -207,6 +204,81 @@ export const colorApi = {
     const response = await api.get('/colors/count');
     return response.data;
   },
+
+  // Color Images API
+  getColorImages: async (colorId: number): Promise<ColorImage[]> => {
+    const response = await api.get(`/colors/${colorId}/images`);
+    return response.data;
+  },
+  uploadColorImages: async (colorId: number, images: FormData): Promise<ColorImage[]> => {
+    const response = await api.post(`/colors/${colorId}/images`, images);
+    return response.data;
+  },
+  deleteColorImage: async (colorId: number, imageId: number): Promise<void> => {
+    await api.delete(`/colors/${colorId}/images/${imageId}`);
+  },
+  setPrimaryColorImage: async (colorId: number, imageId: number): Promise<ColorImage> => {
+    const response = await api.put(`/colors/${colorId}/images/${imageId}/primary`);
+    return response.data;
+  },
+  deleteColorImages: async (colorId: number): Promise<void> => {
+    await api.delete(`/colors/${colorId}/images`);
+  },
+};
+
+// Auth API
+export const authApi = {
+  login: async (data: { username: string; password: string }): Promise<{ token: string; user: User }> => {
+    const response = await api.post('/auth/login', data);
+    return response.data;
+  },
+  register: async (data: { 
+    username: string; 
+    email: string; 
+    phone: string; 
+    password: string; 
+    role: string; 
+  }): Promise<{ message: string; email?: string; requiresVerification?: boolean }> => {
+    const response = await api.post('/auth/register', data);
+    return response.data;
+  },
+  verifyEmail: async (data: {
+    email: string;
+    username: string;
+    phone: string;
+    password: string;
+    role: string;
+    code: string;
+  }): Promise<{ message: string }> => {
+    const response = await api.post('/auth/verify-email', data);
+    return response.data;
+  },
+  resendVerification: async (data: {
+    email: string;
+    username: string;
+  }): Promise<{ message: string }> => {
+    const response = await api.post('/auth/resend-verification', data);
+    return response.data;
+  },
+  forgotPassword: async (data: { email: string }): Promise<{ message: string }> => {
+    const response = await api.post('/auth/forgot-password', data);
+    return response.data;
+  },
+  resetPassword: async (data: { 
+    email: string; 
+    token: string; 
+    newPassword: string; 
+  }): Promise<{ message: string }> => {
+    const response = await api.post('/auth/reset-password', data);
+    return response.data;
+  },
+  verifyToken: async (): Promise<User> => {
+    const response = await api.get('/auth/verify');
+    return response.data;
+  },
+  logout: async (): Promise<void> => {
+    await api.post('/auth/logout');
+  }
 };
 
 // Brand API
@@ -227,12 +299,14 @@ export const brandApi = {
     if (response.status === 404) return null;
     return response.data;
   },
-  createBrand: async (data: { brandName: string; logoUrl?: string; description?: string; website?: string; }): Promise<Brand> => {
-    const response = await api.post('/brands', data);
+  createBrand: async (data: { brandName: string; logoUrl?: string; description?: string; website?: string; } | FormData): Promise<Brand> => {
+    const config = data instanceof FormData ? { headers: { 'Content-Type': 'multipart/form-data' } } : {};
+    const response = await api.post('/brands', data, config);
     return response.data;
   },
-  updateBrand: async (id: number, data: { brandName: string; logoUrl?: string; description?: string; website?: string; }): Promise<Brand> => {
-    const response = await api.put(`/brands/${id}`, data);
+  updateBrand: async (id: number, data: { brandName: string; logoUrl?: string; description?: string; website?: string; } | FormData): Promise<Brand> => {
+    const config = data instanceof FormData ? { headers: { 'Content-Type': 'multipart/form-data' } } : {};
+    const response = await api.put(`/brands/${id}`, data, config);
     return response.data;
   },
   deleteBrand: async (id: number): Promise<void> => {
@@ -293,12 +367,32 @@ export const productApi = {
     const response = await api.post('/products', data);
     return response.data;
   },
+  createProductWithImages: async (data: FormData): Promise<Product> => {
+    const response = await api.post('/products', data);
+    return response.data;
+  },
   updateProduct: async (id: number, data: Partial<Product>): Promise<Product> => {
     const response = await api.put(`/products/${id}`, data);
     return response.data;
   },
   deleteProduct: async (id: number): Promise<void> => {
     await api.delete(`/products/${id}`);
+  },
+  // Product Images API
+  getProductImages: async (productId: number): Promise<ProductImage[]> => {
+    const response = await api.get(`/products/${productId}/images`);
+    return response.data;
+  },
+  uploadProductImages: async (productId: number, images: FormData): Promise<ProductImage[]> => {
+    const response = await api.post(`/products/${productId}/images`, images);
+    return response.data;
+  },
+  setPrimaryProductImage: async (productId: number, imageId: number): Promise<ProductImage> => {
+    const response = await api.put(`/products/${productId}/images/${imageId}/primary`);
+    return response.data;
+  },
+  deleteProductImage: async (productId: number, imageId: number): Promise<void> => {
+    await api.delete(`/products/${productId}/images/${imageId}`);
   },
 };
 

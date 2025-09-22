@@ -43,14 +43,9 @@ public class Product {
     // @Column(name = "price", nullable = false)
     // private BigDecimal price;
     
-    @Column(name = "image_url", length = 500)
-    private String imageUrl;
-    
     @Column(name = "thumbnail_url", length = 500)
     private String thumbnailUrl;
     
-    @Column(name = "gallery_images", columnDefinition = "TEXT")
-    private String galleryImages;
     
     // Stock quantity is now managed at variant level
     // @Column(name = "stock_quantity", nullable = false)

@@ -16,16 +16,11 @@ import org.springframework.web.multipart.MultipartFile;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 
-import java.io.IOException;
 import java.math.BigDecimal;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
-import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/variants")
@@ -49,8 +44,6 @@ public class ProductVariantController {
     @Autowired
     private com.example.demo_store.service.ProductCountService productCountService;
     
-    // Upload directory
-    private static final String UPLOAD_DIR = "uploads/variants/";
     
     // GET /api/variants/product/{productId} - Lấy danh sách biến thể của sản phẩm
     @GetMapping("/product/{productId}")
@@ -130,12 +123,6 @@ public class ProductVariantController {
                 return ResponseEntity.badRequest().build();
             }
             
-            // Xử lý upload ảnh
-            String imagePath = null;
-            if (image != null && !image.isEmpty()) {
-                imagePath = saveImage(image);
-            }
-            
             // Tạo biến thể mới
             ProductVariant variant = new ProductVariant();
             variant.setProduct(product.get());
@@ -145,7 +132,6 @@ public class ProductVariantController {
             variant.setPrice(price);
             variant.setStock(stock);
             variant.setStatus(ProductVariant.VariantStatus.valueOf(status));
-            variant.setImagePath(imagePath);
             
             ProductVariant savedVariant = variantRepository.save(variant);
             
@@ -284,9 +270,9 @@ public class ProductVariantController {
         }
     }
     
-    // POST /api/variants/{id}/images - Upload ảnh cho biến thể
+    // POST /api/variants/{id}/images - Upload ảnh cho biến thể (DEPRECATED)
     @PostMapping(value = "/{id}/images", consumes = "multipart/form-data")
-    public ResponseEntity<ProductVariantDTO> uploadVariantImage(
+    public ResponseEntity<?> uploadVariantImage(
             @PathVariable Long id,
             @RequestParam("image") MultipartFile image) {
         try {
@@ -296,17 +282,8 @@ public class ProductVariantController {
                 return ResponseEntity.notFound().build();
             }
             
-            ProductVariant variant = variantOptional.get();
-            
-            // Xử lý upload ảnh
-            if (!image.isEmpty()) {
-                String imagePath = saveImage(image);
-                variant.setImagePath(imagePath);
-                ProductVariant updatedVariant = variantRepository.save(variant);
-                return ResponseEntity.ok(ProductVariantDTO.fromEntity(updatedVariant));
-            }
-            
-            return ResponseEntity.badRequest().build();
+            // Variants no longer handle images - images are managed at product and color level
+            return ResponseEntity.badRequest().body(Map.of("message", "Image upload is no longer supported for variants. Please use product or color image management."));
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.status(500).build();
@@ -421,25 +398,6 @@ public class ProductVariantController {
         return result;
     }
     
-    private String saveImage(MultipartFile image) throws IOException {
-        // Create upload directory if not exists
-        Path uploadPath = Paths.get(UPLOAD_DIR);
-        if (!Files.exists(uploadPath)) {
-            Files.createDirectories(uploadPath);
-        }
-        
-        // Generate unique filename
-        String originalFilename = image.getOriginalFilename();
-        String extension = originalFilename != null ? 
-            originalFilename.substring(originalFilename.lastIndexOf(".")) : ".jpg";
-        String filename = UUID.randomUUID().toString() + extension;
-        
-        // Save file
-        Path filePath = uploadPath.resolve(filename);
-        Files.copy(image.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
-        
-        return UPLOAD_DIR + filename;
-    }
     
     // Request/Response classes
     public static class BulkVariantCreateRequest {

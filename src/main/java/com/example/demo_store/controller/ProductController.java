@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import jakarta.validation.Valid;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -87,6 +88,16 @@ public class ProductController {
                     ProductDTO dto = ProductDTO.fromEntity(product);
                     // Tính tổng tồn kho từ variants
                     dto.setTotalStock(calculateTotalStock(product.getProductId()));
+                    // Lấy gallery images
+                    try {
+                        List<ProductImage> galleryImages = productImageService.getProductImages(product.getProductId().intValue());
+                        System.out.println("Product " + product.getProductId() + " has " + galleryImages.size() + " gallery images");
+                        dto.setGalleryImages(galleryImages);
+                    } catch (Exception e) {
+                        System.out.println("Error getting gallery images for product " + product.getProductId() + ": " + e.getMessage());
+                        // Nếu có lỗi khi lấy ảnh, để trống
+                        dto.setGalleryImages(new ArrayList<>());
+                    }
                     return dto;
                 })
                 .toList();
@@ -113,6 +124,18 @@ public class ProductController {
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.status(500).build();
+        }
+    }
+    
+    
+    // PUT /api/products/{id}/images/{imageId}/primary - Đặt ảnh làm ảnh chính
+    @PutMapping("/{id}/images/{imageId}/primary")
+    public ResponseEntity<ProductImage> setPrimaryImage(@PathVariable Long id, @PathVariable Integer imageId) {
+        ProductImage primaryImage = productImageService.updatePrimaryImage(id.intValue(), imageId);
+        if (primaryImage != null) {
+            return ResponseEntity.ok(primaryImage);
+        } else {
+            return ResponseEntity.notFound().build();
         }
     }
     
@@ -192,8 +215,96 @@ public class ProductController {
     // @GetMapping("/price-range")
     // public ResponseEntity<List<Product>> getProductsByPriceRange(...)
     
-    // POST /api/products - Tạo product mới (parent product)
-    @PostMapping
+    // POST /api/products - Tạo product mới với upload ảnh
+    @PostMapping(consumes = "multipart/form-data")
+    public ResponseEntity<ProductDTO> createProductWithImages(
+            @RequestParam("productName") String productName,
+            @RequestParam("description") String description,
+            @RequestParam("sku") String sku,
+            @RequestParam("status") String status,
+            @RequestParam(value = "genderId", required = false) Long genderId,
+            @RequestParam(value = "brandId", required = false) Long brandId,
+            @RequestParam(value = "categoryId", required = false) Long categoryId,
+            @RequestParam(value = "categoryIds", required = false) String categoryIds,
+            @RequestParam(value = "thumbnail", required = false) MultipartFile thumbnail,
+            @RequestParam(value = "images", required = false) MultipartFile[] images) {
+        
+        try {
+            Product product = new Product();
+            product.setProductName(productName);
+            product.setDescription(description);
+            product.setSku(sku);
+            product.setStatus(Product.ProductStatus.valueOf(status));
+            
+            // Set gender
+            if (genderId != null) {
+                Optional<Gender> gender = genderRepository.findById(genderId);
+                if (gender.isPresent()) {
+                    product.setGender(gender.get());
+                }
+            }
+            
+            // Set brand
+            if (brandId != null) {
+                Optional<Brand> brand = brandRepository.findById(brandId);
+                if (brand.isPresent()) {
+                    product.setBrand(brand.get());
+                }
+            }
+            
+            // Set multiple categories
+            if (categoryIds != null && !categoryIds.isEmpty()) {
+                Set<Category> categories = new HashSet<>();
+                String[] ids = categoryIds.split(",");
+                for (String id : ids) {
+                    try {
+                        Long categoryIdLong = Long.parseLong(id.trim());
+                        Optional<Category> category = categoryRepository.findById(categoryIdLong);
+                        if (category.isPresent()) {
+                            categories.add(category.get());
+                        }
+                    } catch (NumberFormatException e) {
+                        // Skip invalid IDs
+                    }
+                }
+                product.setCategories(categories);
+            }
+            
+            // Set single category for backward compatibility
+            if (categoryId != null) {
+                Optional<Category> category = categoryRepository.findById(categoryId);
+                if (category.isPresent()) {
+                    product.setCategory(category.get());
+                }
+            }
+            
+            // Handle thumbnail upload
+            if (thumbnail != null && !thumbnail.isEmpty()) {
+                String thumbnailFileName = fileStorageService.storeFile(thumbnail);
+                product.setThumbnailUrl("/api/files/view/" + thumbnailFileName);
+            }
+            
+            Product savedProduct = productRepository.save(product);
+            
+            // Handle gallery images upload
+            if (images != null && images.length > 0) {
+                productImageService.saveProductImages(savedProduct.getProductId().intValue(), images);
+            }
+            
+            // Update product counts for categories and brand
+            productCountService.updateProductCounts(savedProduct);
+            
+            ProductDTO productDTO = ProductDTO.fromEntity(savedProduct);
+            productDTO.setTotalStock(calculateTotalStock(savedProduct.getProductId()));
+            return ResponseEntity.ok(productDTO);
+            
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+    
+    // POST /api/products - Tạo product mới (parent product) - JSON only
+    @PostMapping(consumes = "application/json")
     public ResponseEntity<ProductDTO> createProduct(@Valid @RequestBody ProductCreateRequest request) {
         try {
             Product product = new Product();
@@ -208,7 +319,6 @@ public class ProductController {
                     product.setGender(gender.get());
                 }
             }
-            product.setImageUrl(request.getImageUrl());
             product.setThumbnailUrl(request.getThumbnailUrl());
             
             // Set brand
@@ -292,9 +402,6 @@ public class ProductController {
                     if (gender.isPresent()) {
                         product.setGender(gender.get());
                     }
-                }
-                if (request.getImageUrl() != null) {
-                    product.setImageUrl(request.getImageUrl());
                 }
                 if (request.getThumbnailUrl() != null) {
                     product.setThumbnailUrl(request.getThumbnailUrl());
@@ -417,7 +524,7 @@ public class ProductController {
     @GetMapping("/{id}/images")
     public ResponseEntity<List<ProductImage>> getProductImages(@PathVariable Long id) {
         try {
-            List<ProductImage> images = productImageService.getProductImages(id);
+            List<ProductImage> images = productImageService.getProductImages(id.intValue());
             return ResponseEntity.ok(images);
         } catch (Exception e) {
             return ResponseEntity.status(500).build();
@@ -428,7 +535,7 @@ public class ProductController {
     @PostMapping(value = "/{id}/images", consumes = "multipart/form-data")
     public ResponseEntity<List<ProductImage>> uploadProductImages(
             @PathVariable Long id,
-            @RequestParam("images") List<MultipartFile> images) {
+            @RequestParam("images") MultipartFile[] images) {
         try {
             // Kiểm tra product tồn tại
             Optional<Product> product = productRepository.findById(id);
@@ -436,7 +543,7 @@ public class ProductController {
                 return ResponseEntity.notFound().build();
             }
             
-            List<ProductImage> uploadedImages = productImageService.uploadProductImages(id, images.toArray(new MultipartFile[0]));
+            List<ProductImage> uploadedImages = productImageService.saveProductImages(id.intValue(), images);
             
             return ResponseEntity.ok(uploadedImages);
         } catch (Exception e) {
@@ -445,61 +552,21 @@ public class ProductController {
         }
     }
     
-    // POST /api/products/{id}/images/upload - Upload nhiều ảnh cho sản phẩm
-    @PostMapping("/{id}/images/upload")
-    public ResponseEntity<?> uploadProductImages(@PathVariable Long id, @RequestParam("files") MultipartFile[] files) {
+    // DELETE /api/products/{id}/images/{imageId} - Xóa 1 ảnh của sản phẩm
+    @DeleteMapping("/{id}/images/{imageId}")
+    public ResponseEntity<Void> deleteProductImage(
+            @PathVariable Long id,
+            @PathVariable Long imageId) {
         try {
-            List<ProductImage> uploadedImages = productImageService.uploadProductImages(id, files);
-            return ResponseEntity.ok().body(new ProductImageUploadResponse(
-                uploadedImages.size() + " images uploaded successfully",
-                uploadedImages
-            ));
+            // Không cần kiểm tra product ở đây, chỉ cần xóa theo imageId
+            productImageService.deleteImage(id, imageId);
+            return ResponseEntity.ok().build();
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(new ErrorResponse("Failed to upload images: " + e.getMessage()));
+            e.printStackTrace();
+            return ResponseEntity.status(500).build();
         }
     }
     
-    // POST /api/products/{id}/images/upload-single - Upload ảnh đơn lẻ
-    @PostMapping("/{id}/images/upload-single")
-    public ResponseEntity<?> uploadSingleImage(@PathVariable Long id, @RequestParam("file") MultipartFile file) {
-        try {
-            ProductImage uploadedImage = productImageService.uploadSingleImage(id, file);
-            return ResponseEntity.ok().body(new ProductImageUploadResponse(
-                "Image uploaded successfully",
-                List.of(uploadedImage)
-            ));
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(new ErrorResponse("Failed to upload image: " + e.getMessage()));
-        }
-    }
-    
-    // PUT /api/products/{id}/images/{imageId}/set-primary - Đặt ảnh chính
-    @PutMapping("/{id}/images/{imageId}/set-primary")
-    public ResponseEntity<?> setPrimaryImage(@PathVariable Long id, @PathVariable Long imageId) {
-        try {
-            ProductImage primaryImage = productImageService.setPrimaryImage(id, imageId);
-            return ResponseEntity.ok().body(new ProductImageUploadResponse(
-                "Primary image set successfully",
-                List.of(primaryImage)
-            ));
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(new ErrorResponse("Failed to set primary image: " + e.getMessage()));
-        }
-    }
-    
-    // PUT /api/products/{id}/images/reorder - Sắp xếp lại thứ tự ảnh
-    @PutMapping("/{id}/images/reorder")
-    public ResponseEntity<?> reorderImages(@PathVariable Long id, @RequestBody ReorderImagesRequest request) {
-        try {
-            List<ProductImage> reorderedImages = productImageService.reorderImages(id, request.getImageIds());
-            return ResponseEntity.ok().body(new ProductImageUploadResponse(
-                "Images reordered successfully",
-                reorderedImages
-            ));
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(new ErrorResponse("Failed to reorder images: " + e.getMessage()));
-        }
-    }
     
     // POST /api/products/{id}/thumbnail - Upload thumbnail cho sản phẩm
     @PostMapping(value = "/{id}/thumbnail", consumes = "multipart/form-data")
@@ -514,7 +581,8 @@ public class ProductController {
             }
             
             // Lưu thumbnail file
-            String thumbnailUrl = fileStorageService.storeFile(thumbnail);
+            String thumbnailFileName = fileStorageService.storeFile(thumbnail);
+            String thumbnailUrl = "/api/files/view/" + thumbnailFileName;
             
             // Cập nhật thumbnailUrl trong product
             Product productEntity = product.get();
@@ -533,73 +601,7 @@ public class ProductController {
         }
     }
     
-    // DELETE /api/products/{id}/images/{imageId} - Xóa ảnh
-    @DeleteMapping("/{id}/images/{imageId}")
-    public ResponseEntity<?> deleteImage(@PathVariable Long id, @PathVariable Long imageId) {
-        try {
-            productImageService.deleteImage(id, imageId);
-            return ResponseEntity.ok().body(new SuccessResponse("Image deleted successfully"));
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(new ErrorResponse("Failed to delete image: " + e.getMessage()));
-        }
-    }
     
-    // DELETE /api/products/{id}/images - Xóa tất cả ảnh của sản phẩm
-    @DeleteMapping("/{id}/images")
-    public ResponseEntity<?> deleteAllImages(@PathVariable Long id) {
-        try {
-            productImageService.deleteAllProductImages(id);
-            return ResponseEntity.ok().body(new SuccessResponse("All images deleted successfully"));
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(new ErrorResponse("Failed to delete images: " + e.getMessage()));
-        }
-    }
-    
-    // GET /api/products/{id}/images/stats - Lấy thống kê ảnh
-    @GetMapping("/{id}/images/stats")
-    public ResponseEntity<?> getImageStats(@PathVariable Long id) {
-        try {
-            Map<String, Object> stats = productImageService.getImageStats(id);
-            return ResponseEntity.ok(stats);
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(new ErrorResponse("Failed to get image stats: " + e.getMessage()));
-        }
-    }
-    
-    // Response classes for image operations
-    public static class ProductImageUploadResponse {
-        private String message;
-        private List<ProductImage> images;
-        
-        public ProductImageUploadResponse(String message, List<ProductImage> images) {
-            this.message = message;
-            this.images = images;
-        }
-        
-        public String getMessage() { return message; }
-        public void setMessage(String message) { this.message = message; }
-        
-        public List<ProductImage> getImages() { return images; }
-        public void setImages(List<ProductImage> images) { this.images = images; }
-    }
-    
-    public static class SuccessResponse {
-        private String message;
-        
-        public SuccessResponse(String message) {
-            this.message = message;
-        }
-        
-        public String getMessage() { return message; }
-        public void setMessage(String message) { this.message = message; }
-    }
-    
-    public static class ReorderImagesRequest {
-        private List<Long> imageIds;
-        
-        public List<Long> getImageIds() { return imageIds; }
-        public void setImageIds(List<Long> imageIds) { this.imageIds = imageIds; }
-    }
 }
 
 // DTO classes
@@ -626,7 +628,7 @@ class ProductDto {
         dto.price = null; // Will be managed at variant level
         dto.stockQuantity = null; // Will be managed at variant level
         dto.status = p.getStatus() != null ? p.getStatus().name() : null;
-        dto.imageUrl = p.getImageUrl();
+        dto.imageUrl = null; // Image URL is now managed in ProductImages table
         dto.thumbnailUrl = p.getThumbnailUrl();
         if (p.getBrand() != null) {
             dto.brand = new SimpleRef(p.getBrand().getBrandId(), p.getBrand().getBrandName());

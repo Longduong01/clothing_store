@@ -82,6 +82,7 @@ export enum SizeStatus {
 export interface Color extends BaseEntity {
   colorId: number;
   colorName: string;
+  colorCode?: string;
   status: ColorStatus;
   productCount: number;
 }
@@ -110,6 +111,7 @@ export interface Product extends BaseEntity {
   price?: number; // Optional for parent products
   imageUrl?: string;
   thumbnailUrl?: string;
+  galleryImages?: ProductImage[]; // Gallery images for the product
   stockQuantity?: number; // Optional for parent products
   totalStock?: number; // Tổng tồn kho từ variants
   status: ProductStatus;
@@ -306,4 +308,21 @@ export interface FilterOptions {
   size?: number;
   sortBy?: string;
   sortDir?: 'asc' | 'desc';
+}
+
+// Product Image types
+export interface ProductImage extends BaseEntity {
+  imageId: number;
+  productId: number;
+  imageUrl: string;
+  imageOrder: number;
+  isPrimary: boolean;
+}
+
+export interface ColorImage extends BaseEntity {
+  imageId: number;
+  colorId: number;
+  imageUrl: string;
+  imageOrder: number;
+  isPrimary: boolean;
 }

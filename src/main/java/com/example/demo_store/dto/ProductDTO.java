@@ -1,6 +1,7 @@
 package com.example.demo_store.dto;
 
 import com.example.demo_store.entity.Product;
+import com.example.demo_store.entity.ProductImage;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
@@ -29,6 +30,9 @@ public class ProductDTO {
     // Multiple categories support
     private List<CategoryRef> categories;
     private String categoriesString; // Comma-separated category names for display
+    
+    // Gallery images
+    private List<ProductImage> galleryImages;
     
     // Nested objects for frontend compatibility
     private CategoryRef category;

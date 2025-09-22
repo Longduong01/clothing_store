@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Card, Table, Button, Space, Input, Modal, Form, notification, Typography, Row, Col, Statistic, Tooltip, Tag, Select } from 'antd';
-import { PlusOutlined, SearchOutlined, EditOutlined, DeleteOutlined, ShoppingOutlined, ReloadOutlined } from '@ant-design/icons';
+import { Card, Table, Button, Space, Input, Modal, Form, notification, Typography, Row, Col, Statistic, Tooltip, Tag, Select, Upload } from 'antd';
+import { PlusOutlined, SearchOutlined, EditOutlined, DeleteOutlined, ShoppingOutlined, ReloadOutlined, UploadOutlined, CameraOutlined } from '@ant-design/icons';
 import { Brand } from '../../types';
 import { brandApi } from '../../services/api.ts';
 import { useMutation } from '../../hooks/useApi.ts';
@@ -18,6 +18,8 @@ const BrandManagement: React.FC = () => {
   const [editing, setEditing] = useState<Brand | null>(null);
   const [showAllRecords, setShowAllRecords] = useState(true); // Mặc định hiển thị tất cả
   const [form] = Form.useForm();
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string>('');
 
   const fetchBrands = async () => {
     setLoading(true);
@@ -45,6 +47,69 @@ const BrandManagement: React.FC = () => {
     }
   };
 
+  const handleLogoChange = (info: any) => {
+    const file = info.file;
+    if (file) {
+      setLogoFile(file);
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setLogoPreview(e.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleRemoveLogo = () => {
+    setLogoPreview('');
+    setLogoFile(null);
+  };
+
+  const handleModalClose = () => {
+    setIsModalVisible(false);
+    setEditing(null);
+    form.resetFields();
+    setLogoFile(null);
+    setLogoPreview('');
+  };
+
+  // Handle direct image upload from table
+  const handleImageUpload = (brandId: number, file: File) => {
+    Modal.confirm({
+      title: <span style={{ fontSize: 18, fontWeight: 700 }}>Xác nhận upload logo</span>,
+      content: <div style={{ fontSize: 16 }}>Upload logo cho thương hiệu này?</div>,
+      okText: 'Upload', cancelText: 'Hủy', okButtonProps: { size: 'large', type: 'primary' }, cancelButtonProps: { size: 'large' },
+      onOk: async () => {
+        try {
+          // Update brand with new logo directly
+          const brand = brands.find(b => b.brandId === brandId);
+          if (brand) {
+            const formData = new FormData();
+            formData.append('brandName', brand.brandName);
+            if (brand.description) formData.append('description', brand.description);
+            if (brand.status) formData.append('status', brand.status);
+            formData.append('logo', file);
+            
+            await updateMut.mutate(brandId, formData);
+            
+            notification.success({ 
+              message: 'Thành công', 
+              description: 'Upload logo thương hiệu thành công' 
+            });
+            playSound('success');
+            await refreshBrands();
+          }
+        } catch (error) {
+          console.error('Upload logo failed:', error);
+          notification.error({ 
+            message: 'Lỗi', 
+            description: 'Upload logo thất bại' 
+          });
+          playSound('error');
+        }
+      },
+    });
+  };
+
   useEffect(() => { fetchBrands(); }, []);
 
   // Fetch lại data khi toggle thay đổi
@@ -68,7 +133,7 @@ const BrandManagement: React.FC = () => {
     }
   };
 
-  const handleCreate = async (values: { brandName: string; logoUrl?: string; description?: string; }) => {
+  const handleCreate = async (values: { brandName: string; description?: string; }) => {
     Modal.confirm({
       title: <span style={{ fontSize: 20, fontWeight: 700 }}>Xác nhận tạo thương hiệu</span>,
       content: <div style={{ fontSize: 18 }}>Tạo thương hiệu "{values.brandName}"?</div>,
@@ -76,18 +141,27 @@ const BrandManagement: React.FC = () => {
       onOk: async () => {
         playSound('confirm');
         try {
-          const res = await createMut.mutate(values);
+          const formData = new FormData();
+          formData.append('brandName', values.brandName);
+          if (values.description) formData.append('description', values.description);
+          if (logoFile) formData.append('logo', logoFile);
+          
+          const res = await createMut.mutate(formData);
           if (res) {
             notification.success({ message: 'Thành công', description: 'Tạo thương hiệu thành công' });
             playSound('success');
-            setIsModalVisible(false); form.resetFields(); await refreshBrands();
+            setIsModalVisible(false); 
+            form.resetFields(); 
+            setLogoFile(null);
+            setLogoPreview('');
+            await refreshBrands();
           }
         } catch { notification.error({ message: 'Lỗi', description: 'Tạo thương hiệu thất bại' }); playSound('error'); }
       },
     });
   };
 
-  const handleUpdate = async (values: { brandName: string; logoUrl?: string; description?: string; }) => {
+  const handleUpdate = async (values: { brandName: string; description?: string; status?: string; }) => {
     if (!editing) return;
     Modal.confirm({
       title: <span style={{ fontSize: 20, fontWeight: 700 }}>Xác nhận cập nhật thương hiệu</span>,
@@ -96,11 +170,30 @@ const BrandManagement: React.FC = () => {
       onOk: async () => {
         playSound('confirm');
         try {
-          const res = await updateMut.mutate(editing.brandId, values);
+          const formData = new FormData();
+          formData.append('brandName', values.brandName);
+          if (values.description) formData.append('description', values.description);
+          if (values.status) formData.append('status', values.status);
+          
+          // Xử lý logo
+          if (logoFile) {
+            // Upload ảnh mới
+            formData.append('logo', logoFile);
+          } else if (!logoPreview && editing.logoUrl) {
+            // Xóa ảnh cũ (gửi empty string để backend xóa)
+            formData.append('logoUrl', '');
+          }
+          
+          const res = await updateMut.mutate(editing.brandId, formData);
           if (res) {
             notification.success({ message: 'Thành công', description: 'Cập nhật thương hiệu thành công' });
             playSound('success');
-            setIsModalVisible(false); setEditing(null); form.resetFields(); await refreshBrands();
+            setIsModalVisible(false); 
+            setEditing(null); 
+            form.resetFields(); 
+            setLogoFile(null);
+            setLogoPreview('');
+            await refreshBrands();
           }
         } catch { notification.error({ message: 'Lỗi', description: 'Cập nhật thương hiệu thất bại' }); playSound('error'); }
       },
@@ -137,6 +230,70 @@ const BrandManagement: React.FC = () => {
         {text}
       </Tag>
     ) },
+    { 
+      title: 'Logo', 
+      dataIndex: 'logoUrl', 
+      key: 'logoUrl',
+      width: 120,
+      render: (logoUrl: string, record: Brand) => (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {logoUrl ? (
+            <img 
+              src={logoUrl} 
+              alt="Brand Logo" 
+              style={{ 
+                width: 50, 
+                height: 50, 
+                objectFit: 'cover', 
+                borderRadius: 4,
+                border: '1px solid #d9d9d9'
+              }}
+            />
+          ) : (
+            <div 
+              style={{ 
+                width: 50, 
+                height: 50, 
+                backgroundColor: '#f5f5f5', 
+                borderRadius: 4, 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center',
+                color: '#999',
+                fontSize: 10,
+                textAlign: 'center',
+                lineHeight: 1.2,
+                padding: 4,
+                border: '1px solid #d9d9d9'
+              }}
+            >
+              Chưa có ảnh
+            </div>
+          )}
+          <Upload
+            beforeUpload={(file) => {
+              handleImageUpload(record.brandId, file);
+              return false;
+            }}
+            accept="image/*"
+            showUploadList={false}
+          >
+            <Button 
+              size="small" 
+              icon={<CameraOutlined />} 
+              type="text"
+              style={{ 
+                padding: '4px 8px',
+                height: 'auto',
+                fontSize: 12
+              }}
+            >
+              {logoUrl ? 'Đổi' : 'Upload'}
+            </Button>
+          </Upload>
+        </div>
+      )
+    },
     {
       title: 'Trạng thái',
       dataIndex: 'status',
@@ -180,7 +337,13 @@ const BrandManagement: React.FC = () => {
     },
     { title: 'Thao tác', key: 'actions', width: 120, render: (_: any, record: Brand) => (
       <Space size="small">
-        <Tooltip title="Sửa"><Button type="text" icon={<EditOutlined />} onClick={() => { setEditing(record); form.setFieldsValue({ brandName: record.brandName, logoUrl: record.logoUrl, description: record.description, status: record.status }); setIsModalVisible(true); }} /></Tooltip>
+        <Tooltip title="Sửa"><Button type="text" icon={<EditOutlined />} onClick={() => { 
+          setEditing(record); 
+          form.setFieldsValue({ brandName: record.brandName, description: record.description, status: record.status }); 
+          setLogoPreview(record.logoUrl || '');
+          setLogoFile(null);
+          setIsModalVisible(true); 
+        }} /></Tooltip>
         <Tooltip title="Xóa"><Button type="text" danger icon={<DeleteOutlined />} onClick={() => confirmDelete(record)} /></Tooltip>
       </Space>
     ) },
@@ -248,11 +411,11 @@ const BrandManagement: React.FC = () => {
             pageSizeOptions: ['5', '10', '20', '50', '100'],
             size: 'default'
           }} 
-          scroll={{ x: 700 }} 
+          scroll={{ x: 800 }} 
         />
       </Card>
 
-      <Modal title={<span style={{ fontSize: 22, fontWeight: 700 }}>{editing ? 'Sửa Thương hiệu' : 'Thêm Thương hiệu mới'}</span>} open={isModalVisible} onCancel={()=>{ setIsModalVisible(false); setEditing(null); form.resetFields(); }} footer={null} width={760} centered>
+      <Modal title={<span style={{ fontSize: 22, fontWeight: 700 }}>{editing ? 'Sửa Thương hiệu' : 'Thêm Thương hiệu mới'}</span>} open={isModalVisible} onCancel={handleModalClose} footer={null} width={760} centered>
         <Form form={form} layout="vertical" onFinish={editing ? handleUpdate : handleCreate}>
           <Form.Item name="brandName" label="Tên thương hiệu" rules={[
             { required: true, message: 'Vui lòng nhập tên thương hiệu' },
@@ -270,8 +433,31 @@ const BrandManagement: React.FC = () => {
           ]}>
             <Input placeholder="Nhập tên thương hiệu" />
           </Form.Item>
-          <Form.Item name="logoUrl" label="Logo URL" rules={[ { type: 'url', message: 'URL không hợp lệ' } ]}>
-            <Input placeholder="https://..." />
+          <Form.Item label="Logo thương hiệu">
+            <Upload
+              name="logo"
+              listType="picture-card"
+              showUploadList={false}
+              beforeUpload={() => false}
+              onChange={handleLogoChange}
+              accept="image/*"
+            >
+              {logoPreview ? (
+                <img src={logoPreview} alt="logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              ) : (
+                <div>
+                  <UploadOutlined />
+                  <div style={{ marginTop: 8 }}>Upload Logo</div>
+                </div>
+              )}
+            </Upload>
+            {logoPreview && (
+              <div style={{ marginTop: 8, textAlign: 'center' }}>
+                <Button size="small" onClick={handleRemoveLogo}>
+                  Xóa ảnh
+                </Button>
+              </div>
+            )}
           </Form.Item>
           <Form.Item name="description" label="Mô tả">
             <Input.TextArea rows={4} placeholder="Mô tả" />
@@ -293,7 +479,7 @@ const BrandManagement: React.FC = () => {
 
           <Form.Item style={{ marginBottom: 0, textAlign: 'right' }}>
             <Space>
-              <Button size="large" onClick={()=>{ setIsModalVisible(false); setEditing(null); form.resetFields(); }}>Hủy</Button>
+              <Button size="large" onClick={handleModalClose}>Hủy</Button>
               <Button type="primary" htmlType="submit" size="large" loading={createMut.isLoading || updateMut.isLoading}>{editing ? 'Cập nhật' : 'Tạo'}</Button>
             </Space>
           </Form.Item>

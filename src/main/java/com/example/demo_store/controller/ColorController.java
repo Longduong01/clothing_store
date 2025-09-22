@@ -2,10 +2,13 @@ package com.example.demo_store.controller;
 
 import com.example.demo_store.entity.Color;
 import com.example.demo_store.entity.Color.ColorStatus;
+import com.example.demo_store.entity.ColorImage;
 import com.example.demo_store.repository.ColorRepository;
+import com.example.demo_store.service.ColorImageService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.Optional;
@@ -16,6 +19,9 @@ public class ColorController {
 
     @Autowired
     private ColorRepository colorRepository;
+    
+    @Autowired
+    private ColorImageService colorImageService;
 
     // GET /api/colors - Lấy tất cả màu sắc (mặc định chỉ ACTIVE, có thể includeInactive)
     @GetMapping
@@ -163,5 +169,60 @@ public class ColorController {
         
         public String getStatus() { return status; }
         public void setStatus(String status) { this.status = status; }
+    }
+    
+    // GET /api/colors/{id}/images - Lấy ảnh của màu sắc
+    @GetMapping("/{id}/images")
+    public ResponseEntity<List<ColorImage>> getColorImages(@PathVariable Long id) {
+        List<ColorImage> images = colorImageService.getColorImages(id.intValue());
+        return ResponseEntity.ok(images);
+    }
+    
+    // POST /api/colors/{id}/images - Upload ảnh cho màu sắc
+    @PostMapping(value = "/{id}/images", consumes = "multipart/form-data")
+    public ResponseEntity<List<ColorImage>> uploadColorImages(
+            @PathVariable Long id,
+            @RequestParam("images") MultipartFile[] images) {
+        try {
+            List<ColorImage> savedImages = colorImageService.saveColorImages(id.intValue(), images);
+            return ResponseEntity.ok(savedImages);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+    
+    // PUT /api/colors/{id}/images/{imageId}/primary - Đặt ảnh làm ảnh chính
+    @PutMapping("/{id}/images/{imageId}/primary")
+    public ResponseEntity<ColorImage> setPrimaryColorImage(@PathVariable Long id, @PathVariable Integer imageId) {
+        ColorImage primaryImage = colorImageService.updatePrimaryImage(id.intValue(), imageId);
+        if (primaryImage != null) {
+            return ResponseEntity.ok(primaryImage);
+        } else {
+            return ResponseEntity.notFound().build();
+        }
+    }
+    
+    // DELETE /api/colors/{id}/images - Xóa tất cả ảnh của màu sắc
+    @DeleteMapping("/{id}/images")
+    public ResponseEntity<Void> deleteColorImages(@PathVariable Long id) {
+        try {
+            colorImageService.deleteColorImages(id.intValue());
+            return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    // DELETE /api/colors/{id}/images/{imageId} - Xóa 1 ảnh của màu sắc
+    @DeleteMapping("/{id}/images/{imageId}")
+    public ResponseEntity<Void> deleteColorImage(
+            @PathVariable Long id,
+            @PathVariable Long imageId) {
+        try {
+            colorImageService.deleteColorImage(id.intValue(), imageId.intValue());
+            return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().build();
+        }
     }
 }
